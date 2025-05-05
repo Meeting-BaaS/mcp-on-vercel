@@ -8,9 +8,6 @@ import { createClient } from "redis";
 import { Readable } from "stream";
 import z from "zod";
 import vercelJson from "../vercel.json";
-import { RedisClientType } from "redis";
-import { registerTools } from "../api/tools.js";
-import { randomUUID } from "node:crypto";
 
 interface ServerOptions extends McpServerOptions {
   parameters?: {
@@ -60,7 +57,7 @@ export function initializeMcpApiHandler(
     res: ServerResponse
   ) {
     await redisPromise;
-    const url = new URL(req.url || "", "https://mcp.meetingbaas.com");
+    const url = new URL(req.url || "", `https://mcp.${process.env.BAAS_URL}`);
 
     // Skip validation for static files
     if (url.pathname.endsWith(".ico") || url.pathname.endsWith(".png")) {

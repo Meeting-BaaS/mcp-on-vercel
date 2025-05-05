@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
-const origin = process.argv[2] || "https://mcp.meetingbaas.com";
+const origin = process.argv[2] || `https://mcp.${process.env.BAAS_URL}`;
 
 async function main() {
   const transport = new SSEClientTransport(new URL(`${origin}/sse`));

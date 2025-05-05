@@ -8,7 +8,7 @@ import { registerEchoTool } from "./tools/utils/echo";
 export function registerTools(server: McpServer, apiKey: string): McpServer {
   const baasClient = new BaasClient({
     apiKey: apiKey,
-    baseUrl: "https://api.meetingbaas.com/",
+    baseUrl: `https://api.${process.env.BAAS_URL}/`,
   });
 
   // Register bot tools

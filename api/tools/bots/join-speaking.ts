@@ -4,7 +4,7 @@ import axios from "axios";
 import { z } from "zod";
 
 // Define the persona types based on the new schema
-const SPEAKING_API_URL = "https://speaking.meetingbaas.com";
+const SPEAKING_API_URL = `https://speaking.${process.env.BAAS_URL}`;
 
 // Hardcoded list of available personas
 const AVAILABLE_PERSONAS = [
