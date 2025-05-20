@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import z from "zod";
 import { registerBotTools } from "./tools/bots/index";
 import { registerEchoTool } from "./tools/utils/echo";
-// import { registerJoinSpeakingTool } from "./tools/bots/join-speaking";
+import { registerJoinSpeakingTool } from "./tools/bots/join-speaking";
 
 export function registerTools(server: McpServer, apiKey: string): McpServer {
   const baasClient = new BaasClient({
@@ -15,6 +15,9 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
   // Register bot tools
   let updatedServer = registerBotTools(server, baasClient);
 
+  // Register speaking tools
+  updatedServer = registerJoinSpeakingTool(updatedServer);
+
   // For Leave Meeting
   updatedServer.tool(
     "leaveMeeting",
@@ -24,7 +27,7 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
       try {
         console.log(`Attempting to remove bot ${botId} from meeting...`);
         const response = await baasClient.defaultApi.leave({
-          uuid: botId
+          data: { botId }
         });
         console.log(
           "Leave meeting response:",
@@ -120,7 +123,7 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
     async ({ botId }: { botId: string }) => {
       try {
         const response = await baasClient.defaultApi.deleteData({
-          uuid: botId
+          data: { botId }
         });
         return {
           content: [
@@ -239,7 +242,7 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
     async ({ calendarId }: { calendarId: string }) => {
       try {
         const response = await baasClient.calendarsApi.getCalendar({
-          uuid: calendarId
+          data: { calendarId }
         });
         return {
           content: [
@@ -264,15 +267,15 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
     }
   );
 
-  // For delete Calendar
+  // For Delete Calendar
   updatedServer.tool(
     "deleteCalendar",
-    "Delete a calendar integration. Use this when you want to: 1) Remove a calendar connection 2) Stop automatic recordings 3) Clean up calendar data",
+    "Delete a calendar integration. Use this when you want to: 1) Remove a calendar connection 2) Stop automatic recordings for a calendar 3) Clean up calendar data",
     { calendarId: z.string() },
     async ({ calendarId }: { calendarId: string }) => {
       try {
         const response = await baasClient.calendarsApi.deleteCalendar({
-          uuid: calendarId
+          data: { calendarId }
         });
         return {
           content: [
@@ -289,6 +292,149 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
             {
               type: "text",
               text: "Failed to delete calendar",
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // For Schedule Record Event
+  updatedServer.tool(
+    "scheduleRecordEvent",
+    "Schedule a meeting to be recorded automatically. Use this when you want to: 1) Set up recording for a future meeting 2) Configure AI bot attendance for an upcoming event 3) Enable transcription for a scheduled meeting",
+    {
+      calendarId: z.string(),
+      eventUuid: z.string(),
+      params: z
+        .object({
+          enableScreenshare: z.boolean().optional(),
+          enableTranscription: z.boolean().optional(),
+          enableCaptions: z.boolean().optional(),
+          enableSpeakerIdentification: z.boolean().optional(),
+          forceReload: z.boolean().optional(),
+          enableBitrate: z.boolean().optional(),
+          waitForAttendees: z.boolean().optional(),
+        })
+        .optional(),
+    },
+    async ({
+      calendarId, 
+      eventUuid,
+      params,
+    }: {
+      calendarId: string;
+      eventUuid: string;
+      params?: {
+        enableScreenshare?: boolean;
+        enableTranscription?: boolean;
+        enableCaptions?: boolean;
+        enableSpeakerIdentification?: boolean;
+        forceReload?: boolean;
+        enableBitrate?: boolean;
+        waitForAttendees?: boolean;
+      };
+    }) => {
+      try {
+        const response = await baasClient.calendarsApi.scheduleRecordEvent({
+          botParam2: {
+            botName: "MeetingBot", // or make this dynamic if you want
+            extra: {}, // or pass real extra data if you have it
+            ...(params || {})
+          }
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Successfully scheduled recording",
+            },
+          ],
+        };
+      } catch (error) {
+        console.error("Failed to schedule recording:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Failed to schedule recording",
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // For Unschedule Record Event
+  updatedServer.tool(
+    "unscheduleRecordEvent",
+    "Cancel a scheduled recording. Use this when you want to: 1) Stop an automatic recording from happening 2) Cancel AI bot attendance for an event 3) Disable transcription for a meeting",
+    { calendarId: z.string(), eventUuid: z.string() },
+    async ({
+      calendarId,
+      eventUuid,
+    }: {
+      calendarId: string;
+      eventUuid: string;
+    }) => {
+      try {
+        // If unscheduleRecordEvent does not require botParam2, call with empty object
+        const response = await baasClient.calendarsApi.unscheduleRecordEvent({});
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Successfully unscheduled recording",
+            },
+          ],
+        };
+      } catch (error) {
+        console.error("Failed to unschedule recording:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Failed to unschedule recording",
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // For Refresh Calendar
+  updatedServer.tool(
+    "refreshCalendar",
+    "Update a calendar's events and settings. Use this when you want to: 1) Sync latest calendar events 2) Refresh meeting schedule information 3) Update recording configurations",
+    { calendarId: z.string() },
+    async ({ calendarId }: { calendarId: string }) => {
+      try {
+        const response = await baasClient.calendarsApi.updateCalendar({
+          updateCalendarParams: {
+            oauthClientId: '',
+            oauthClientSecret: '',
+            oauthRefreshToken: '',
+            platform: Provider.google
+          }
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Successfully refreshed calendar",
+            },
+          ],
+        };
+      } catch (error) {
+        console.error("Failed to refresh calendar:", error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Failed to refresh calendar",
             },
           ],
           isError: true,
@@ -363,90 +509,6 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
     }
   );
 
-  // For Schedule Record Events
-  updatedServer.tool(
-    "scheduleRecordEvent",
-    "Schedule a recording. Use this when you want to: 1) Set up automatic recording 2) Schedule future transcriptions 3) Plan meeting recordings",
-    {
-      eventUuid: z.string(),
-      botName: z.string(),
-      extra: z.record(z.unknown()).optional(),
-      allOccurrences: z.boolean().optional(),
-    },
-    async ({ eventUuid, botName, extra, allOccurrences }) => {
-      try {
-        const botParams = {
-          botName,
-          extra: extra || {},
-        };
-
-        const response = await baasClient.calendarsApi.scheduleRecordEvent({
-          uuid: eventUuid,
-          botParam2: botParams,
-          allOccurrences: allOccurrences || false
-        });
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Successfully scheduled event recording",
-            },
-          ],
-        };
-      } catch (error) {
-        console.error("Failed to schedule event recording:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to schedule event recording",
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  // For Un-Schedule Record Events
-  updatedServer.tool(
-    "unscheduleRecordEvent",
-    "Cancel a scheduled recording. Use this when you want to: 1) Cancel automatic recording 2) Stop planned transcription 3) Remove scheduled bot activity",
-    {
-      eventUuid: z.string(),
-      allOccurrences: z.boolean().optional(),
-    },
-    async ({ eventUuid, allOccurrences }) => {
-      try {
-        const response = await baasClient.calendarsApi.unscheduleRecordEvent({
-          uuid: eventUuid,
-          allOccurrences: allOccurrences || false
-        });
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Successfully unscheduled event recording",
-            },
-          ],
-        };
-      } catch (error) {
-        console.error("Failed to unschedule event recording:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to unschedule event recording",
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
   // For Update Calendar
   updatedServer.tool(
     "updateCalendar",
@@ -475,7 +537,6 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
         };
 
         const response = await baasClient.calendarsApi.updateCalendar({
-          uuid: calendarId,
           updateCalendarParams: updateParams
         });
 

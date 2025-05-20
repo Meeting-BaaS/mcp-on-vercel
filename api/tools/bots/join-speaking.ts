@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 // @ts-ignore
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { z } from "zod";
 
 // Define the persona types based on the new schema
@@ -88,8 +88,7 @@ const AVAILABLE_PERSONAS = [
 // Define types based on the OpenAPI specification
 interface BotRequest {
   meeting_url: string;
-  bot_name: string;
-  meeting_baas_api_key: string;
+  bot_name?: string;
   personas?: string[] | null;
   bot_image?: string | null;
   entry_message?: string | null;
@@ -101,6 +100,35 @@ interface JoinResponse {
   bot_id: string;
 }
 
+interface LeaveBotRequest {
+  bot_id: string | null;
+}
+
+/**
+ * Generate a curl command for debugging purposes
+ */
+function generateCurlCommand(
+  method: string, 
+  url: string, 
+  data: Record<string, any>,
+  headers: Record<string, string>
+): string {
+  // Mask the API key in the headers for security
+  const maskedHeaders = { ...headers };
+  if (maskedHeaders['x-meeting-baas-api-key']) {
+    const prefix = maskedHeaders['x-meeting-baas-api-key'].split('_').slice(0, 2).join('_');
+    maskedHeaders['x-meeting-baas-api-key'] = `${prefix}_${'*'.repeat(20)}`;
+  }
+  
+  const headersStr = Object.entries(maskedHeaders)
+    .map(([key, value]) => `-H "${key}: ${value}"`)
+    .join(' \\\n  ');
+  
+  return `curl -X ${method} ${url} \\
+  ${headersStr} \\
+  -d '${JSON.stringify(data, null, 2)}'`;
+}
+
 export function registerJoinSpeakingTool(server: McpServer): McpServer {
   // For Join Speaking Meeting
   server.tool(
@@ -110,6 +138,7 @@ export function registerJoinSpeakingTool(server: McpServer): McpServer {
       meetingUrl: z.string().url().describe("URL of the meeting to join"),
       botName: z
         .string()
+        .optional()
         .describe("Name to display for the bot in the meeting"),
       meetingBaasApiKey: z
         .string()
@@ -145,23 +174,36 @@ export function registerJoinSpeakingTool(server: McpServer): McpServer {
     },
     async (params) => {
       try {
-        // Create the bot request according to the new schema
+        console.log("Joining speaking meeting with params:", JSON.stringify(params, null, 2));
+        
+        // Create a minimal request with just the required fields
         const botRequest: BotRequest = {
           meeting_url: params.meetingUrl,
-          bot_name: params.botName,
-          meeting_baas_api_key: params.meetingBaasApiKey,
-          personas: params.personas || null,
-          bot_image: params.botImage || null,
-          entry_message: params.entryMessage || null,
-          enable_tools: params.enableTools,
-          extra: params.extra || null,
         };
 
-        // Make a direct API call to the new endpoint
+        // Add optional fields only if they are provided
+        if (params.botName) botRequest.bot_name = params.botName;
+        if (params.personas) botRequest.personas = params.personas;
+        if (params.botImage) botRequest.bot_image = params.botImage;
+        if (params.entryMessage) botRequest.entry_message = params.entryMessage;
+        if (params.enableTools !== undefined) botRequest.enable_tools = params.enableTools;
+        if (params.extra) botRequest.extra = params.extra;
+
+        console.log(`Making request to ${SPEAKING_API_URL}/bots`);
+        
+        // Make a direct API call to the endpoint with API key in header
         const response = await axios.post<JoinResponse>(
           `${SPEAKING_API_URL}/bots`,
-          botRequest
+          botRequest,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-meeting-baas-api-key': params.meetingBaasApiKey,
+            },
+          }
         );
+
+        console.log("Response from speaking API:", JSON.stringify(response.data, null, 2));
 
         if (response.data.bot_id) {
           return {
@@ -183,11 +225,40 @@ export function registerJoinSpeakingTool(server: McpServer): McpServer {
           ],
           isError: true,
         };
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Failed to join meeting with speaking bot:", error);
 
+        // Generate curl command for debugging with API key in header
+        const curlCommand = generateCurlCommand(
+          'POST', 
+          `${SPEAKING_API_URL}/bots`,
+          {
+            meeting_url: params.meetingUrl,
+            bot_name: params.botName,
+            personas: params.personas,
+            bot_image: params.botImage,
+            entry_message: params.entryMessage,
+            enable_tools: params.enableTools,
+            extra: params.extra,
+          },
+          {
+            'Content-Type': 'application/json',
+            'x-meeting-baas-api-key': params.meetingBaasApiKey,
+          }
+        );
+
         let errorMessage = "Failed to join meeting with speaking bot: ";
-        if (error instanceof Error) {
+        // Handle axios errors more specifically
+        if (axios.isAxiosError(error)) {
+          const axiosError = error as AxiosError;
+          errorMessage += `${axiosError.message}`;
+          if (axiosError.response) {
+            errorMessage += ` - Status: ${axiosError.response.status}`;
+            if (axiosError.response.data) {
+              errorMessage += ` - Details: ${JSON.stringify(axiosError.response.data)}`;
+            }
+          }
+        } else if (error instanceof Error) {
           errorMessage += error.message;
         } else if (typeof error === "string") {
           errorMessage += error;
@@ -200,6 +271,10 @@ export function registerJoinSpeakingTool(server: McpServer): McpServer {
             {
               type: "text",
               text: errorMessage,
+            },
+            {
+              type: "text",
+              text: "\n\nFor debugging, you can try this curl command:\n\n" + curlCommand,
             },
           ],
           isError: true,
@@ -222,13 +297,20 @@ export function registerJoinSpeakingTool(server: McpServer): McpServer {
     },
     async (params) => {
       try {
-        const leaveRequest = {
-          meeting_baas_api_key: params.meetingBaasApiKey,
+        console.log("Leaving speaking meeting with params:", JSON.stringify(params, null, 2));
+        
+        const leaveRequest: LeaveBotRequest = {
           bot_id: params.botId,
         };
 
+        console.log(`Making request to ${SPEAKING_API_URL}/bots/${params.botId}`);
+
         await axios.delete(`${SPEAKING_API_URL}/bots/${params.botId}`, {
           data: leaveRequest,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-meeting-baas-api-key': params.meetingBaasApiKey,
+          },
         });
 
         return {
@@ -239,11 +321,34 @@ export function registerJoinSpeakingTool(server: McpServer): McpServer {
             },
           ],
         };
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Failed to remove speaking bot from meeting:", error);
 
+        // Generate curl command for debugging with API key in header
+        const curlCommand = generateCurlCommand(
+          'DELETE', 
+          `${SPEAKING_API_URL}/bots/${params.botId}`,
+          {
+            bot_id: params.botId,
+          },
+          {
+            'Content-Type': 'application/json',
+            'x-meeting-baas-api-key': params.meetingBaasApiKey,
+          }
+        );
+
         let errorMessage = "Failed to remove speaking bot: ";
-        if (error instanceof Error) {
+        // Handle axios errors more specifically
+        if (axios.isAxiosError(error)) {
+          const axiosError = error as AxiosError;
+          errorMessage += `${axiosError.message}`;
+          if (axiosError.response) {
+            errorMessage += ` - Status: ${axiosError.response.status}`;
+            if (axiosError.response.data) {
+              errorMessage += ` - Details: ${JSON.stringify(axiosError.response.data)}`;
+            }
+          }
+        } else if (error instanceof Error) {
           errorMessage += error.message;
         } else if (typeof error === "string") {
           errorMessage += error;
@@ -256,6 +361,10 @@ export function registerJoinSpeakingTool(server: McpServer): McpServer {
             {
               type: "text",
               text: errorMessage,
+            },
+            {
+              type: "text",
+              text: "\n\nFor debugging, you can try this curl command:\n\n" + curlCommand,
             },
           ],
           isError: true,
