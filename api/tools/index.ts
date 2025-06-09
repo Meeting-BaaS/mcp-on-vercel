@@ -1,22 +1,15 @@
-import { BaasClient } from "@meeting-baas/sdk/dist/baas/api/client.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { registerBotTools } from "./bots";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import { BaasClient } from "@meeting-baas/sdk/dist/baas/api/client";
+import { registerJoinTool } from "./bots/join";
 import { registerEchoTool } from "./utils/echo";
-// import { registerJoinSpeakingTool } from "./bots/join-speaking";
 
 export function registerTools(server: McpServer, apiKey: string): McpServer {
   const baasClient = new BaasClient({
     apiKey: apiKey,
     baseUrl: `https://api.${process.env.BAAS_URL}/`,
   });
-
-  // Register bot tools
-  let updatedServer = registerBotTools(server, baasClient);
-
-  // Add echo tool for testing
-  const finalServer = registerEchoTool(updatedServer);
-
-  return finalServer;
+  let updatedServer = registerJoinTool(server, baasClient);
+  return registerEchoTool(updatedServer);
 }
 
 export default registerTools;

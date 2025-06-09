@@ -142,36 +142,6 @@ async function main() {
         console.error("Join error:", error);
       }
     }
-
-    // Test joinSpeakingMeeting tool
-    console.log("\nTesting joinSpeakingMeeting tool:");
-    try {
-      const joinSpeakingResult = await client.callTool({
-        name: "joinSpeakingMeeting",
-        arguments: {
-          meetingUrl: "https://meet.google.com/gwt-jpqj-exx",
-          botName: "SpeakingTestBot",
-          meetingBaasApiKey: process.env.BAAS_API_KEY || "test-key",
-        },
-      });
-      if (joinSpeakingResult.content?.length) {
-        console.log(
-          "Join Speaking response:",
-          joinSpeakingResult.content.map((c) => c.text).join("")
-        );
-      } else {
-        console.log(
-          "Join Speaking result:",
-          JSON.stringify(joinSpeakingResult, null, 2)
-        );
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error("Join Speaking error:", error.message);
-      } else {
-        console.error("Join Speaking error:", error);
-      }
-    }
   } catch (error) {
     if (error instanceof Error) {
       console.error("Error:", error.message);

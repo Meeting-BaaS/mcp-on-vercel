@@ -2,7 +2,6 @@ import { BaasClient } from "@meeting-baas/sdk/dist/baas/api/client";
 import { Provider } from "@meeting-baas/sdk/dist/baas/models/provider";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
 import z from "zod";
-import { registerBotTools } from "./tools/bots/index";
 import { registerEchoTool } from "./tools/utils/echo";
 
 export function registerTools(server: McpServer, apiKey: string): McpServer {
@@ -11,8 +10,7 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
     baseUrl: `https://api.${process.env.BAAS_URL}/`,
   });
 
-  // Register bot tools
-  let updatedServer = registerBotTools(server, baasClient);
+  let updatedServer = server;
 
   // For Leave Meeting
   updatedServer.tool(
@@ -161,6 +159,12 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
       oauthRefreshToken,
       platform,
       rawCalendarId,
+    }: {
+      oauthClientId: string;
+      oauthClientSecret: string;
+      oauthRefreshToken: string;
+      platform: "Google" | "Microsoft";
+      rawCalendarId?: string;
     }) => {
       try {
         const calendarParams = {
@@ -372,7 +376,7 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
       extra: z.record(z.unknown()).optional(),
       allOccurrences: z.boolean().optional(),
     },
-    async ({ eventUuid, botName, extra, allOccurrences }) => {
+    async ({ eventUuid, botName, extra, allOccurrences }: { eventUuid: string; botName: string; extra?: Record<string, unknown>; allOccurrences?: boolean }) => {
       try {
         const botParams = {
           botName,
@@ -416,7 +420,7 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
       eventUuid: z.string(),
       allOccurrences: z.boolean().optional(),
     },
-    async ({ eventUuid, allOccurrences }) => {
+    async ({ eventUuid, allOccurrences }: { eventUuid: string; allOccurrences?: boolean }) => {
       try {
         const response = await baasClient.calendarsApi.unscheduleRecordEvent({
           uuid: eventUuid,
@@ -463,6 +467,12 @@ export function registerTools(server: McpServer, apiKey: string): McpServer {
       oauthClientSecret,
       oauthRefreshToken,
       platform,
+    }: {
+      calendarId: string;
+      oauthClientId: string;
+      oauthClientSecret: string;
+      oauthRefreshToken: string;
+      platform: "Google" | "Microsoft";
     }) => {
       try {
         const updateParams = {

@@ -13,7 +13,6 @@ The server implements the Model Context Protocol (MCP) that integrates with Meet
 ## Features
 
 - Integration with [Meeting Baas SDK](https://www.npmjs.com/package/@meeting-baas/sdk) for video meeting management
-- Support for both standard and speaking bots
 - Calendar integration for automated meeting recordings
 - Real-time transcription and audio streaming capabilities
 - Comprehensive bot management tools
@@ -84,7 +83,6 @@ This fork includes several Meeting Baas-specific tools:
 ### Meeting Management
 - Join meetings with AI bots
 - Record meetings with transcription
-- Manage speaking bots with different personas
 - Leave meetings and clean up resources
 
 ### Calendar Management
@@ -112,8 +110,7 @@ This fork adds:
 1. Meeting Baas SDK integration
 2. Enhanced bot management capabilities
 3. Calendar integration features
-4. Speaking bot support with personas
-5. Improved error handling and logging
+4. Improved error handling and logging
 
 ## Contributing
 

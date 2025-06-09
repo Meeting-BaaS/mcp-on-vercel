@@ -15,17 +15,8 @@ const handler = initializeMcpApiHandler(
             "Send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using Gladia), and provide real-time audio streams.",
           category: "Meeting Management",
         },
-        joinSpeakingMeeting: {
-          description:
-            "Send an AI speaking bot to join a video meeting. The bot can assist in meetings with voice AI capabilities.",
-          category: "Meeting Management",
-        },
         leaveMeeting: {
           description: "Remove an AI bot from a meeting.",
-          category: "Meeting Management",
-        },
-        leaveSpeakingMeeting: {
-          description: "Remove a speaking bot from a meeting by its ID.",
           category: "Meeting Management",
         },
         getMeetingData: {
