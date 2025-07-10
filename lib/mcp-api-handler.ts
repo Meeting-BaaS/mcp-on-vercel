@@ -8,6 +8,7 @@ import { createClient } from "redis";
 import { Readable } from "stream";
 import z from "zod";
 import vercelJson from "../vercel.json";
+import crypto from "crypto";
 
 interface ServerOptions extends McpServerOptions {
   parameters?: {
