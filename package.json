@@ -7,9 +7,13 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "start": "node -r dotenv/config dist/api/server.js",
-    "dev": "tsc --watch & node -r dotenv/config dist/api/server.js",
-    "test-client": "tsc && node dist/scripts/test-client.js"
+    "start": "echo \"Use 'pnpm local' to run the local server or deploy to Vercel for production\" && exit 1",
+    "dev": "pnpm local:dev",
+    "test-client": "tsc && node dist/scripts/test-client.js",
+    "local": "tsc && node -r dotenv/config dist/server.js",
+    "local:dev": "tsc --watch & node -r dotenv/config dist/server.js",
+    "local:build": "tsc",
+    "local:start": "node -r dotenv/config dist/server.js"
   },
   "keywords": [],
   "author": "",
