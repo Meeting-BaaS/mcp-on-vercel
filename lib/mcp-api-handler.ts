@@ -60,8 +60,10 @@ export function initializeMcpApiHandler(
 
     if (url.pathname === "/sse" || url.pathname === "/message") {
       // If the environment is pre-prod, use the pre-prod API URL
-      const environment = url.searchParams.get("environment")
-      baseUrl = baseUrl || getApiUrl(environment)
+      const environment = req.headers["x-environment"] || ""
+      baseUrl = getApiUrl(Array.isArray(environment) ? environment[0] : environment)
+      console.log("The environment is", environment)
+      console.log("The API Base Url has been set to", baseUrl)
 
       // Try schema-based validation first if available
       if (

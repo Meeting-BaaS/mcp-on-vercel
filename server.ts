@@ -11,7 +11,7 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
     res.setHeader(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, x-meeting-baas-api-key, x-meetingbaas-apikey, x-api-key"
+      "Content-Type, Authorization, x-meeting-baas-api-key, x-meetingbaas-apikey, x-api-key, x-environment"
     )
 
     if (req.method === "OPTIONS") {
