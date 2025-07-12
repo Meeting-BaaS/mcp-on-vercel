@@ -1,10 +1,13 @@
 <p align="center"><a href="https://discord.com/invite/dsvFgDTr6c"><img height="60px" src="https://user-images.githubusercontent.com/31022056/158916278-4504b838-7ecb-4ab9-a900-7dc002aade78.png" alt="Join our Discord!"></a></p>
 
-# Meeting Baas MCP Server on Vercel
+# Meeting Baas MCP Server
 
 This is the main MCP (Model Context Protocol) server powering [chat.meetingbaas.com](https://chat.meetingbaas.com), providing the LLM integration and AI capabilities for the Meeting Baas chat interface. It's a fork of the [Vercel MCP template](https://github.com/vercel-labs/mcp-on-vercel) with Meeting Baas-specific modifications.
 
+## Changes have been made to this fork so that it can be deployed on a traditional server. To deploy it on Vercel, vercel.json would need to be recreated
+
 The server implements the Model Context Protocol (MCP) that integrates with Meeting Baas services, enabling:
+
 - AI-powered chat interactions
 - Meeting automation through LLMs
 - Intelligent bot management
@@ -35,8 +38,9 @@ The following environment variables are required:
 - `REDIS_URL`: URL to your Redis instance (required for session management)
 
 Optional environment variables:
+
 - `NODE_ENV`: Set to "development" for development mode
-- `LOG_LEVEL`: Set the logging level (defaults to "info")
+- `PORT`: Defaults to 3000
 - `BAAS_API_KEY`: Your Meeting Baas API key (only used in development mode)
 
 ## Authentication
@@ -50,6 +54,7 @@ The server supports multiple ways to provide the Meeting Baas API key:
    - `Authorization` (as a Bearer token)
 
 2. Request body (for POST requests):
+
    ```json
    {
      "apiKey": "your-api-key"
@@ -57,6 +62,7 @@ The server supports multiple ways to provide the Meeting Baas API key:
    ```
 
 3. Environment variable (development mode only):
+
    ```bash
    BAAS_API_KEY=your-api-key
    ```
@@ -73,7 +79,20 @@ Update `api/server.ts` with your tools, prompts, and resources following the [MC
 
 - Requires a Redis attached to the project under `process.env.REDIS_URL`
 - Make sure you have [Fluid compute](https://vercel.com/docs/functions/fluid-compute) enabled for efficient execution
-- After enabling Fluid compute, open `vercel.json` and adjust max duration to 800 if you using a Vercel Pro or Enterprise account
+- After enabling Fluid compute, create a `vercel.json` and adjust max duration to 800 if you using a Vercel Pro or Enterprise account.
+- An example of `vercel.json`:
+
+````json
+{
+  "rewrites": [{ "source": "/(.+)", "destination": "/api/server" }],
+  "functions": {
+    "api/server.ts": {
+      "maxDuration": 800
+    }
+  }
+}
+````
+
 - [Deploy the MCP template](https://vercel.com/templates/other/model-context-protocol-mcp-with-vercel-functions)
 
 ## Meeting Baas Integration
@@ -81,17 +100,20 @@ Update `api/server.ts` with your tools, prompts, and resources following the [MC
 This fork includes several Meeting Baas-specific tools:
 
 ### Meeting Management
+
 - Join meetings with AI bots
 - Record meetings with transcription
 - Leave meetings and clean up resources
 
 ### Calendar Management
+
 - Create and manage calendar integrations
 - Schedule automated recordings
 - List and manage calendar events
 - Update calendar configurations
 
 ### Bot Management
+
 - List and monitor active bots
 - Get detailed bot metadata
 - Manage bot configurations
@@ -107,6 +129,7 @@ node scripts/test-client.mjs https://mcp-on-vercel.vercel.app
 ## Differences from Original Template
 
 This fork adds:
+
 1. Meeting Baas SDK integration
 2. Enhanced bot management capabilities
 3. Calendar integration features
@@ -119,6 +142,7 @@ This is a fork of the Vercel MCP template. For the original template, please vis
 ## Documentation
 
 For more information about the Meeting Baas SDK, visit:
+
 - [SDK Documentation](https://docs.meetingbaas.com/com/docs/typescript-sdk)
 - [npm Package](https://www.npmjs.com/package/@meeting-baas/sdk)
 - [GitHub Repository](https://github.com/Meeting-Baas/sdk)
