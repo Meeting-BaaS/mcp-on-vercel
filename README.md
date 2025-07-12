@@ -4,7 +4,7 @@
 
 This is the main MCP (Model Context Protocol) server powering [chat.meetingbaas.com](https://chat.meetingbaas.com), providing the LLM integration and AI capabilities for the Meeting BaaS chat interface. It's a fork of the [Vercel MCP template](https://github.com/vercel-labs/mcp-on-vercel) with Meeting BaaS-specific modifications.
 
-> Note: Changes have been made to this fork so that it can be deployed on a traditional server. To deploy it on Vercel, vercel.json would need to be recreated
+**Note:** This fork can be deployed on a traditional server. To deploy on Vercel, you must recreate a `vercel.json` file.
 
 The server implements the Model Context Protocol (MCP) that integrates with Meeting BaaS services, enabling:
 
@@ -39,9 +39,9 @@ The following environment variables are required:
 
 Optional environment variables:
 
-- `NODE_ENV`: Set to "development" for development mode
-- `PORT`: Defaults to 3000
-- `BAAS_API_KEY`: Your Meeting BaaS API key (only used in development mode)
+- `NODE_ENV`: Set to `"development"` to enable development mode.
+- `PORT`: Port the server listens on (default: `3000`).
+- `BAAS_API_KEY`: Meeting BaaS API key (development mode only).
 
 ## Authentication
 
@@ -79,7 +79,7 @@ Update `api/server.ts` with your tools, prompts, and resources following the [MC
 
 - Requires a Redis attached to the project under `process.env.REDIS_URL`
 - Make sure you have [Fluid compute](https://vercel.com/docs/functions/fluid-compute) enabled for efficient execution
-- After enabling Fluid compute, create a `vercel.json` and adjust max duration to 800 if you using a Vercel Pro or Enterprise account.
+- After enabling Fluid compute, create a `vercel.json` and set `maxDuration` to `800` if you are using a Vercel Pro or Enterprise account.
 - An example of `vercel.json`:
 
 ````json
