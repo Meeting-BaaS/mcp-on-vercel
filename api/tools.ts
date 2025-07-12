@@ -1,520 +1,517 @@
-import { BaasClient } from "@meeting-baas/sdk/dist/baas/api/client";
-import { Provider } from "@meeting-baas/sdk/dist/baas/models/provider";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
-import z from "zod";
-import { registerEchoTool } from "./tools/utils/echo";
+import {
+  botsWithMetadataQueryParams,
+  createBaasClient,
+  createCalendarBody,
+  getMeetingDataQueryParams,
+  joinBody,
+  listEventsQueryParams,
+  retranscribeBotBody,
+  scheduleRecordEventBody,
+  updateCalendarBody
+} from "@meeting-baas/sdk"
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp"
+import z from "zod"
 
-export function registerTools(server: McpServer, apiKey: string): McpServer {
-  const baasClient = new BaasClient({
-    apiKey: apiKey,
-    baseUrl: `https://api.${process.env.BAAS_URL}/`,
-  });
+export function registerTools(server: McpServer, apiKey: string, baseUrl?: string): McpServer {
+  console.log("Registering tools with baseUrl", baseUrl)
+  const baasClient = createBaasClient({
+    api_key: apiKey,
+    base_url: baseUrl
+  })
 
-  let updatedServer = server;
+  // For Join Meeting
+  server.tool(
+    "joinMeeting",
+    "Send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using Gladia), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
+    joinBody.shape,
+    async (args) => {
+      console.log("Attempting to join meeting", args)
+      const { data, success, error } = await baasClient.joinMeeting(args)
+      if (!success) {
+        console.error("Failed to join meeting", error)
+        return {
+          content: [{ type: "text", text: `Failed to join meeting: ${error.message}` }],
+          isError: true
+        }
+      }
+      console.log("Joined meeting successfully", data)
+      return {
+        content: [{ type: "text", text: `Successfully joined meeting, bot_id: ${data.bot_id}` }]
+      }
+    }
+  )
 
   // For Leave Meeting
-  updatedServer.tool(
+  server.tool(
     "leaveMeeting",
     "Remove an AI bot from a meeting. Use this when you want to: 1) End a meeting recording 2) Stop transcription 3) Disconnect the bot from the meeting",
-    { botId: z.string() },
-    async ({ botId }: { botId: string }) => {
-      try {
-        console.log(`Attempting to remove bot ${botId} from meeting...`);
-        const response = await baasClient.defaultApi.leave({
-          uuid: botId,
-        });
-        console.log(
-          "Leave meeting response:",
-          JSON.stringify(response.data, null, 2)
-        );
+    { bot_id: z.string() },
+    async (args) => {
+      const { bot_id } = args
+      console.log(`Attempting to remove bot ${bot_id} from meeting`)
+      const { data, success, error } = await baasClient.leaveMeeting({ uuid: bot_id })
 
-        if (!response.data) {
-          console.error("Leave meeting response missing data");
-          return {
-            content: [
-              {
-                type: "text",
-                text: "Failed to leave meeting: No response data received",
-              },
-            ],
-            isError: true,
-          };
-        }
-
+      if (!success) {
+        console.error("Failed to leave meeting", error)
         return {
           content: [
             {
               type: "text",
-              text: `Successfully removed bot ${botId} from meeting`,
-            },
+              text: `Failed to leave meeting: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to leave meeting:", error);
-        let errorMessage = "Failed to leave meeting";
-
-        if (error instanceof Error) {
-          console.error("Error details:", {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-          });
-          errorMessage += `: ${error.message}`;
-        } else if (typeof error === "object" && error !== null) {
-          console.error("Error object:", JSON.stringify(error, null, 2));
+          isError: true
         }
+      }
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: errorMessage,
-            },
-          ],
-          isError: true,
-        };
+      console.log("Meeting left successfully", data)
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully removed bot ${bot_id} from meeting`
+          }
+        ]
       }
     }
-  );
+  )
 
   // For Get Meeting Data
-  updatedServer.tool(
+  server.tool(
     "getMeetingData",
     "Get data about a meeting that a bot has joined. Use this when you want to: 1) Check meeting status 2) Get recording information 3) Access transcription data",
-    { botId: z.string() },
-    async ({ botId }: { botId: string }) => {
-      try {
-        //
-        const response = await baasClient.defaultApi.getMeetingData({ botId });
+    getMeetingDataQueryParams.shape,
+    async (args) => {
+      console.log("Attempting to get meeting data", args)
+      const { data, success, error } = await baasClient.getMeetingData(args)
+
+      if (!success) {
+        console.error("Failed to get meeting data", error)
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
-            },
+              text: `Failed to get meeting data: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to get meeting data:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to get meeting data",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
       }
     }
-  );
+  )
 
   // For Delete Data
-  updatedServer.tool(
+  server.tool(
     "deleteData",
     "Delete data associated with a meeting bot. Use this when you want to: 1) Remove meeting recordings 2) Delete transcription data 3) Clean up bot data",
-    { botId: z.string() },
-    async ({ botId }: { botId: string }) => {
-      try {
-        const response = await baasClient.defaultApi.deleteData({
-          uuid: botId,
-        });
+    { bot_id: z.string() },
+    async (args) => {
+      const { bot_id } = args
+      console.log("Attempting to delete meeting data", args)
+      const { success, error } = await baasClient.deleteBotData({ uuid: bot_id })
+
+      if (!success) {
+        console.error("Failed to delete meeting data", error)
         return {
           content: [
             {
               type: "text",
-              text: "Successfully deleted meeting data",
-            },
+              text: `Failed to delete meeting data: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to delete meeting data:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to delete meeting data",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Successfully deleted meeting data"
+          }
+        ]
       }
     }
-  );
+  )
+
+  // For Re-Transcribe Bot
+  server.tool(
+    "retranscribeBot",
+    "Transcribe or retranscribe a bot recording using the Default or provided Speech to Text Provider. Use this when you want to: 1) Transcribe a bot recording 2) Retranscribe if you want to improve the transcription",
+    retranscribeBotBody.shape,
+    async (args) => {
+      console.log("Attempting to retranscribe bot", args)
+      const { data, success, error } = await baasClient.retranscribeBot(args)
+
+      if (!success) {
+        console.error("Failed to retranscribe bot", error)
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to retranscribe bot: ${error.message}`
+            }
+          ],
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
+      }
+    }
+  )
 
   // For Create Calendar
-  updatedServer.tool(
+  server.tool(
     "createCalendar",
     "Create a new calendar integration. Use this when you want to: 1) Set up automatic meeting recordings 2) Configure calendar-based bot scheduling 3) Enable recurring meeting coverage",
-    {
-      oauthClientId: z.string(),
-      oauthClientSecret: z.string(),
-      oauthRefreshToken: z.string(),
-      platform: z.enum(["Google", "Microsoft"]),
-      rawCalendarId: z.string().optional(),
-    },
-    async ({
-      oauthClientId,
-      oauthClientSecret,
-      oauthRefreshToken,
-      platform,
-      rawCalendarId,
-    }: {
-      oauthClientId: string;
-      oauthClientSecret: string;
-      oauthRefreshToken: string;
-      platform: "Google" | "Microsoft";
-      rawCalendarId?: string;
-    }) => {
-      try {
-        const calendarParams = {
-          oauthClientId,
-          oauthClientSecret,
-          oauthRefreshToken,
-          platform:
-            platform === "Google" ? Provider.google : Provider.microsoft,
-          rawCalendarId,
-        };
+    createCalendarBody.shape,
+    async (args) => {
+      console.log("Attempting to create calendar", args)
+      const { data, success, error } = await baasClient.createCalendar(args)
 
-        const response = await baasClient.calendarsApi.createCalendar({
-          createCalendarParams: calendarParams,
-        });
-
+      if (!success) {
+        console.error("Failed to create calendar", error)
         return {
           content: [
             {
               type: "text",
-              text: "Successfully created calendar",
-            },
+              text: `Failed to create calendar: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to create calendar:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to create calendar",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully created calendar: ${JSON.stringify(data, null, 2)}`
+          }
+        ]
       }
     }
-  );
+  )
 
   // For List Calendar
-  updatedServer.tool(
+  server.tool(
     "listCalendars",
     "List all calendar integrations. Use this when you want to: 1) View configured calendars 2) Check calendar status 3) Manage calendar integrations",
     {},
     async () => {
-      try {
-        const response = await baasClient.calendarsApi.listCalendars();
+      console.log("Attempting to list calendars")
+      const { data, success, error } = await baasClient.listCalendars()
+
+      if (!success) {
+        console.error("Failed to list calendars", error)
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
-            },
+              text: `Failed to list calendars: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to list calendars:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to list calendars",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
       }
     }
-  );
+  )
 
   // For Get Calendar
-  updatedServer.tool(
+  server.tool(
     "getCalendar",
     "Get details about a specific calendar integration. Use this when you want to: 1) View calendar configuration 2) Check calendar status 3) Verify calendar settings",
-    { calendarId: z.string() },
-    async ({ calendarId }: { calendarId: string }) => {
-      try {
-        const response = await baasClient.calendarsApi.getCalendar({
-          uuid: calendarId,
-        });
+    { calendar_id: z.string() },
+    async (args) => {
+      const { calendar_id } = args
+      console.log("Attempting to get calendar", args)
+      const { data, success, error } = await baasClient.getCalendar({ uuid: calendar_id })
+
+      if (!success) {
+        console.error("Failed to get calendar", error)
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
-            },
+              text: `Failed to get calendar: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to get calendar:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to get calendar",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
       }
     }
-  );
+  )
 
   // For delete Calendar
-  updatedServer.tool(
+  server.tool(
     "deleteCalendar",
     "Delete a calendar integration. Use this when you want to: 1) Remove a calendar connection 2) Stop automatic recordings 3) Clean up calendar data",
-    { calendarId: z.string() },
-    async ({ calendarId }: { calendarId: string }) => {
-      try {
-        const response = await baasClient.calendarsApi.deleteCalendar({
-          uuid: calendarId,
-        });
+    { calendar_id: z.string() },
+    async (args) => {
+      const { calendar_id } = args
+      console.log("Attempting to delete calendar", args)
+      const { success, error } = await baasClient.deleteCalendar({ uuid: calendar_id })
+
+      if (!success) {
+        console.error("Failed to delete calendar", error)
         return {
           content: [
             {
               type: "text",
-              text: "Successfully deleted calendar",
-            },
+              text: `Failed to delete calendar: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to delete calendar:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to delete calendar",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Successfully deleted calendar"
+          }
+        ]
       }
     }
-  );
+  )
 
   // For Bots with meta data
-  updatedServer.tool(
+  server.tool(
     "botsWithMetadata",
     "Get a list of all bots with their metadata. Use this when you want to: 1) View active bots 2) Check bot status 3) Monitor bot activity",
-    {},
-    async () => {
-      try {
-        //
-        const response = await baasClient.defaultApi.botsWithMetadata();
+    botsWithMetadataQueryParams.shape,
+    async (args) => {
+      console.log("Attempting to get bots with metadata", args)
+      const { data, success, error } = await baasClient.listBots(args)
+
+      if (!success) {
+        console.error("Failed to get bots with metadata", error)
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
-            },
+              text: `Failed to get bots with metadata: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to get bots with metadata:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to get bots with metadata",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
       }
     }
-  );
+  )
 
   // For List All Events
-  updatedServer.tool(
+  server.tool(
     "listEvents",
     "List all scheduled events. Use this when you want to: 1) View upcoming recordings 2) Check scheduled transcriptions 3) Monitor planned bot activity",
-    { calendarId: z.string() },
-    async ({ calendarId }) => {
-      try {
-        //
-        const response = await baasClient.calendarsApi.listEvents({
-          calendarId,
-        });
+    listEventsQueryParams.shape,
+    async (args) => {
+      console.log("Attempting to list events", args)
+      const { data, success, error } = await baasClient.listCalendarEvents(args)
+
+      if (!success) {
+        console.error("Failed to list events", error)
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(response.data, null, 2),
-            },
+              text: `Failed to list events: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to list events:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to list events",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2)
+          }
+        ]
       }
     }
-  );
+  )
 
   // For Schedule Record Events
-  updatedServer.tool(
+  server.tool(
     "scheduleRecordEvent",
     "Schedule a recording. Use this when you want to: 1) Set up automatic recording 2) Schedule future transcriptions 3) Plan meeting recordings",
     {
-      eventUuid: z.string(),
-      botName: z.string(),
-      extra: z.record(z.unknown()).optional(),
-      allOccurrences: z.boolean().optional(),
+      calendar_id: z.string(),
+      all_occurrences: z.boolean().optional(),
+      ...scheduleRecordEventBody.shape
     },
-    async ({ eventUuid, botName, extra, allOccurrences }: { eventUuid: string; botName: string; extra?: Record<string, unknown>; allOccurrences?: boolean }) => {
-      try {
-        const botParams = {
-          botName,
-          extra: extra || {},
-        };
+    async (args) => {
+      const { calendar_id, all_occurrences, ...body } = args
+      console.log("Attempting to schedule event recording", args)
 
-        const response = await baasClient.calendarsApi.scheduleRecordEvent({
-          uuid: eventUuid,
-          botParam2: botParams,
-          allOccurrences: allOccurrences || false,
-        });
+      const params = {
+        uuid: calendar_id,
+        body,
+        query: { all_occurrences: all_occurrences || false }
+      }
 
+      const { data, success, error } = await baasClient.scheduleCalendarRecordEvent(params)
+
+      if (!success) {
+        console.error("Failed to schedule event recording", error)
         return {
           content: [
             {
               type: "text",
-              text: "Successfully scheduled event recording",
-            },
+              text: `Failed to schedule event recording: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to schedule event recording:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to schedule event recording",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully scheduled event recording, events: ${JSON.stringify(data, null, 2)}`
+          }
+        ]
       }
     }
-  );
+  )
 
   // For Un-Schedule Record Events
-  updatedServer.tool(
+  server.tool(
     "unscheduleRecordEvent",
     "Cancel a scheduled recording. Use this when you want to: 1) Cancel automatic recording 2) Stop planned transcription 3) Remove scheduled bot activity",
     {
-      eventUuid: z.string(),
-      allOccurrences: z.boolean().optional(),
+      event_uuid: z.string(),
+      all_occurrences: z.boolean().optional()
     },
-    async ({ eventUuid, allOccurrences }: { eventUuid: string; allOccurrences?: boolean }) => {
-      try {
-        const response = await baasClient.calendarsApi.unscheduleRecordEvent({
-          uuid: eventUuid,
-          allOccurrences: allOccurrences || false,
-        });
+    async (args) => {
+      const { event_uuid, all_occurrences } = args
+      console.log("Attempting to unschedule event recording", args)
+      const { data, success, error } = await baasClient.unscheduleCalendarRecordEvent({
+        uuid: event_uuid,
+        query: { all_occurrences: all_occurrences || false }
+      })
 
+      if (!success) {
+        console.error("Failed to unschedule event recording", error)
         return {
           content: [
             {
               type: "text",
-              text: "Successfully unscheduled event recording",
-            },
+              text: `Failed to unschedule event recording: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to unschedule event recording:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to unschedule event recording",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully unscheduled event recording, removed events: ${JSON.stringify(data, null, 2)}`
+          }
+        ]
       }
     }
-  );
+  )
 
   // For Update Calendar
-  updatedServer.tool(
+  server.tool(
     "updateCalendar",
     "Update a calendar integration configuration. Use this when you want to: 1) Modify calendar settings 2) Update connection details 3) Change calendar configuration",
     {
-      calendarId: z.string(),
-      oauthClientId: z.string(),
-      oauthClientSecret: z.string(),
-      oauthRefreshToken: z.string(),
-      platform: z.enum(["Google", "Microsoft"]),
+      calendar_id: z.string(),
+      ...updateCalendarBody.shape
     },
-    async ({
-      calendarId,
-      oauthClientId,
-      oauthClientSecret,
-      oauthRefreshToken,
-      platform,
-    }: {
-      calendarId: string;
-      oauthClientId: string;
-      oauthClientSecret: string;
-      oauthRefreshToken: string;
-      platform: "Google" | "Microsoft";
-    }) => {
-      try {
-        const updateParams = {
-          oauthClientId,
-          oauthClientSecret,
-          oauthRefreshToken,
-          platform:
-            platform === "Google" ? Provider.google : Provider.microsoft,
-        };
+    async (args) => {
+      const { calendar_id, ...body } = args
+      console.log("Attempting to update calendar", args)
+      const { data, success, error } = await baasClient.updateCalendar({
+        uuid: calendar_id,
+        body
+      })
 
-        const response = await baasClient.calendarsApi.updateCalendar({
-          uuid: calendarId,
-          updateCalendarParams: updateParams,
-        });
-
+      if (!success) {
+        console.error("Failed to update calendar", error)
         return {
           content: [
             {
               type: "text",
-              text: "Successfully updated calendar",
-            },
+              text: `Failed to update calendar: ${error.message}`
+            }
           ],
-        };
-      } catch (error) {
-        console.error("Failed to update calendar:", error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Failed to update calendar",
-            },
-          ],
-          isError: true,
-        };
+          isError: true
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Successfully updated calendar, updated calendar: ${JSON.stringify(data, null, 2)}`
+          }
+        ]
       }
     }
-  );
+  )
 
   // Add echo tool for testing
-  const finalServer = registerEchoTool(updatedServer);
+  server.tool("echo", { message: z.string() }, async ({ message }: { message: string }) => ({
+    content: [
+      {
+        type: "text",
+        text: `Tool echo: ${message}`
+      }
+    ]
+  }))
 
-  return finalServer;
+  return server
 }
 
-export default registerTools;
+export default registerTools
