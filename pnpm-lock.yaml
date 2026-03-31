@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   '@meeting-baas/sdk':
-    specifier: ^5.0.0
-    version: 5.0.0
+    specifier: ^6.0.5
+    version: 6.0.5
   '@modelcontextprotocol/sdk':
     specifier: ^1.10.2
     version: 1.10.2
@@ -400,8 +400,8 @@ packages:
       '@jridgewell/sourcemap-codec': 1.5.0
     dev: true
 
-  /@meeting-baas/sdk@5.0.0:
-    resolution: {integrity: sha512-PSVeDRg0ZPqhEUKobGs2h91lqt6zxCMJ0HZUTaiDAjl2dmgBLSrY97i8IaCJu+/N4xlIdY4Jr2wWzUaqGbWqKA==}
+  /@meeting-baas/sdk@6.0.5:
+    resolution: {integrity: sha512-gDF2P/bQ9wZ1tO5V1/pNRj/FCIXGEUtd6VF1tox2WKDYxB7NU0VppEXwZfwWPDm3bCw72GDre1+XA67WnBFlPw==}
     engines: {node: '>=18.0.0'}
     dependencies:
       axios: 1.8.3

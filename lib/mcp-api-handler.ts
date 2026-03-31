@@ -28,7 +28,7 @@ interface SerializedRequest {
 const redisUrl = getRedisUrl()
 
 export function initializeMcpApiHandler(
-  initializeServer: (server: McpServer, apiKey: string, baseUrl?: string) => void,
+  initializeServer: (server: McpServer, apiKey: string, baseUrl?: string, apiVersion?: "v1" | "v2") => void,
   serverOptions: ServerOptions = {}
 ) {
   const redis = createClient({
@@ -47,58 +47,63 @@ export function initializeMcpApiHandler(
 
   let servers: McpServer[] = []
 
-  let statelessServer: McpServer
-  let statelessTransport: SSEServerTransport | null = null
+  const statelessServers: Record<string, McpServer> = {}
+  const statelessTransports: Record<string, SSEServerTransport | null> = {}
 
   return async function mcpApiHandler(req: IncomingMessage, res: ServerResponse) {
     await redisPromise
     const url = new URL(req.url || "", MCP_URL)
 
-    // Only validate API key for SSE and chat endpoints
+    // Extract common headers for all endpoints
     let apiKey: string | null = null
     let baseUrl: string | undefined
 
-    if (url.pathname === "/sse" || url.pathname === "/message") {
-      // If the environment is pre-prod, use the pre-prod API URL
-      const environment = req.headers["x-environment"] || ""
-      baseUrl = getApiUrl(Array.isArray(environment) ? environment[0] : environment)
-      console.log("The environment is", environment)
-      console.log("The API Base Url has been set to", baseUrl)
+    // If the environment is pre-prod, use the pre-prod API URL
+    const environment = req.headers["x-environment"] || ""
+    baseUrl = getApiUrl(Array.isArray(environment) ? environment[0] : environment)
+    console.log("The environment is", environment)
+    console.log("The API Base Url has been set to", baseUrl)
 
-      // Try schema-based validation first if available
-      if (
-        serverOptions.parameters?.schema &&
-        req.method === "POST" &&
-        req.headers["content-length"]
-      ) {
-        try {
-          const body = await getRawBody(req, {
-            length: req.headers["content-length"],
-            encoding: "utf-8"
-          })
+    // Extract API version from header (default to v1 for backward compatibility)
+    let apiVersion: "v1" | "v2" = "v1"
+    const versionHeader = req.headers["x-api-version"]
+    const versionValue = Array.isArray(versionHeader) ? versionHeader[0] : versionHeader
+    if (versionValue === "v2") {
+      apiVersion = "v2"
+    }
+    console.log("API version:", apiVersion)
 
-          const params = JSON.parse(body)
-          const result = serverOptions.parameters.schema.safeParse(params)
-          if (result.success) {
-            apiKey = result.data.apiKey
-          }
-        } catch (error) {
-          console.error("Error parsing parameters:", error)
+    // Try schema-based validation first if available
+    if (
+      serverOptions.parameters?.schema &&
+      req.method === "POST" &&
+      req.headers["content-length"]
+    ) {
+      try {
+        const body = await getRawBody(req, {
+          length: req.headers["content-length"],
+          encoding: "utf-8"
+        })
+
+        const params = JSON.parse(body)
+        const result = serverOptions.parameters.schema.safeParse(params)
+        if (result.success) {
+          apiKey = result.data.apiKey
         }
+      } catch (error) {
+        console.error("Error parsing parameters:", error)
       }
+    }
 
-      // If schema validation failed or not available, try headers
-      if (!apiKey) {
-        apiKey =
-          (req.headers["x-meeting-baas-api-key"] as string) ||
-          (req.headers["x-meetingbaas-apikey"] as string) ||
-          (req.headers["x-api-key"] as string) ||
-          (req.headers["authorization"] as string)?.replace(/bearer\s+/i, "") ||
-          (process.env.NODE_ENV === "development" ? process.env.BAAS_API_KEY : null) ||
-          null
-      }
-
-      // Authentication is optional, so we don't return an error if no API key is found
+    // If schema validation failed or not available, try headers
+    if (!apiKey) {
+      apiKey =
+        (req.headers["x-meeting-baas-api-key"] as string) ||
+        (req.headers["x-meetingbaas-apikey"] as string) ||
+        (req.headers["x-api-key"] as string) ||
+        (req.headers["authorization"] as string)?.replace(/bearer\s+/i, "") ||
+        (process.env.NODE_ENV === "development" ? process.env.BAAS_API_KEY : null) ||
+        null
     }
 
     if (url.pathname === "/mcp") {
@@ -132,8 +137,9 @@ export function initializeMcpApiHandler(
       }
       console.log("Got new MCP connection", req.url, req.method)
 
-      if (!statelessServer) {
-        statelessServer = new McpServer(
+      // Cache one stateless server per API version so v1 and v2 clients are served correctly
+      if (!statelessServers[apiVersion]) {
+        statelessServers[apiVersion] = new McpServer(
           {
             name: "mcp-typescript server on vercel",
             version: "0.1.0"
@@ -142,19 +148,19 @@ export function initializeMcpApiHandler(
         )
 
         try {
-          initializeServer(statelessServer, apiKey || "", baseUrl)
+          initializeServer(statelessServers[apiVersion], apiKey || "", baseUrl, apiVersion)
         } catch (error) {
           console.error("Error initializing server:", error)
           // Continue without failing - authentication is optional
         }
       }
 
-      if (!statelessTransport) {
-        statelessTransport = new SSEServerTransport("/message", res)
-        await statelessServer.connect(statelessTransport)
+      if (!statelessTransports[apiVersion]) {
+        statelessTransports[apiVersion] = new SSEServerTransport("/message", res)
+        await statelessServers[apiVersion].connect(statelessTransports[apiVersion]!)
       }
 
-      await statelessTransport.handlePostMessage(req, res)
+      await statelessTransports[apiVersion]!.handlePostMessage(req, res)
     } else if (url.pathname === "/sse") {
       console.log("Got new SSE connection")
 
@@ -169,7 +175,7 @@ export function initializeMcpApiHandler(
       )
 
       try {
-        initializeServer(server, apiKey || "", baseUrl)
+        initializeServer(server, apiKey || "", baseUrl, apiVersion)
       } catch (error) {
         console.error("Error initializing server:", error)
         // Continue without failing - authentication is optional
