@@ -65,11 +65,25 @@ export function initializeMcpApiHandler(
     console.log("The API Base Url has been set to", baseUrl)
 
     // Extract API version from header (default to v1 for backward compatibility)
-    let apiVersion: "v1" | "v2" = "v1"
     const versionHeader = req.headers["x-api-version"]
     const versionValue = Array.isArray(versionHeader) ? versionHeader[0] : versionHeader
-    if (versionValue === "v2") {
-      apiVersion = "v2"
+    let apiVersion: "v1" | "v2" = "v1"
+    if (versionValue !== undefined) {
+      if (versionValue === "v1" || versionValue === "v2") {
+        apiVersion = versionValue
+      } else {
+        res.writeHead(400, { "Content-Type": "application/json" }).end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32600,
+              message: `Unsupported API version: "${versionValue}". Supported versions are "v1" and "v2".`
+            },
+            id: null
+          })
+        )
+        return
+      }
     }
     console.log("API version:", apiVersion)
 
@@ -137,9 +151,12 @@ export function initializeMcpApiHandler(
       }
       console.log("Got new MCP connection", req.url, req.method)
 
-      // Cache one stateless server per API version so v1 and v2 clients are served correctly
-      if (!statelessServers[apiVersion]) {
-        statelessServers[apiVersion] = new McpServer(
+      // Cache one stateless server per (apiVersion, apiKey, baseUrl) tuple so
+      // different credentials / environments are never shared across callers.
+      const cacheKey = `${apiVersion}:${apiKey || ""}:${baseUrl || ""}`
+
+      if (!statelessServers[cacheKey]) {
+        statelessServers[cacheKey] = new McpServer(
           {
             name: "mcp-typescript server on vercel",
             version: "0.1.0"
@@ -148,19 +165,19 @@ export function initializeMcpApiHandler(
         )
 
         try {
-          initializeServer(statelessServers[apiVersion], apiKey || "", baseUrl, apiVersion)
+          initializeServer(statelessServers[cacheKey], apiKey || "", baseUrl, apiVersion)
         } catch (error) {
           console.error("Error initializing server:", error)
           // Continue without failing - authentication is optional
         }
       }
 
-      if (!statelessTransports[apiVersion]) {
-        statelessTransports[apiVersion] = new SSEServerTransport("/message", res)
-        await statelessServers[apiVersion].connect(statelessTransports[apiVersion]!)
+      if (!statelessTransports[cacheKey]) {
+        statelessTransports[cacheKey] = new SSEServerTransport("/message", res)
+        await statelessServers[cacheKey].connect(statelessTransports[cacheKey]!)
       }
 
-      await statelessTransports[apiVersion]!.handlePostMessage(req, res)
+      await statelessTransports[cacheKey]!.handlePostMessage(req, res)
     } else if (url.pathname === "/sse") {
       console.log("Got new SSE connection")
 

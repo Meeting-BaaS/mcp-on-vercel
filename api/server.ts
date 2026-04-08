@@ -188,6 +188,13 @@ const handler = initializeMcpApiHandler(
           apiVersion: "v2"
         },
 
+        // V2 AI Agent Tools Category
+        getTranscript: {
+          description: "Get a meeting transcript as a readable dialog or full JSON with metadata.",
+          category: "AI Agent Tools",
+          apiVersion: "v2"
+        },
+
         // Utility Category
         echo: {
           description: "Echo a message back.",

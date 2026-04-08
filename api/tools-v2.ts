@@ -5,6 +5,7 @@ import {
   type BaasClient
 } from "@meeting-baas/sdk"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp"
+import axios from "axios"
 import z from "zod"
 
 // Helper to get the v2 client type
@@ -100,8 +101,45 @@ const botConfigShape = {
 //   - deleteZoomCredential    (delete a Zoom credential)
 // ---------------------------------------------------------------------------
 
+/** Strip sensitive fields before logging. Only keeps IDs, names, and status-like keys. */
+function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const sensitiveKeys = new Set([
+    "api_key", "oauth_client_secret", "oauth_refresh_token",
+    "secret", "input_url", "output_url", "meeting_url"
+  ])
+  const redacted: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(args)) {
+    redacted[key] = sensitiveKeys.has(key) ? "[REDACTED]" : value
+  }
+  return redacted
+}
+
+interface Utterance {
+  speaker: string
+  text: string
+  start?: number
+  end?: number
+}
+
+/** Extract utterances from various transcription provider formats. */
+function extractUtterances(data: any): Utterance[] | null {
+  // Gladia format: { result: { utterances: [...] } }
+  if (data?.result?.utterances && Array.isArray(data.result.utterances)) {
+    return data.result.utterances
+  }
+  // Direct format: { utterances: [...] }
+  if (data?.utterances && Array.isArray(data.utterances)) {
+    return data.utterances
+  }
+  // Plain array
+  if (Array.isArray(data)) {
+    return data
+  }
+  return null
+}
+
 export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: string): McpServer {
-  console.log("Registering v2 tools with baseUrl", baseUrl)
+  console.log("Registering v2 tools")
   const baasClient: V2Client = createBaasClient({
     api_key: apiKey,
     api_version: "v2",
@@ -116,7 +154,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Create and send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech, and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
     botConfigShape,
     async (args) => {
-      console.log("Attempting to create bot", args)
+      console.log("Attempting to create bot", redactArgs(args))
       const result = await baasClient.createBot(args)
       if (!result.success) {
         console.error("Failed to create bot", result.error)
@@ -125,7 +163,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
           isError: true
         }
       }
-      console.log("Bot created successfully", result.data)
+      console.log("Bot created successfully")
       return {
         content: [{ type: "text" as const, text: `Successfully created bot: ${JSON.stringify(result.data, null, 2)}` }]
       }
@@ -252,7 +290,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       join_at: z.string().describe("ISO8601 timestamp for when the bot should join the meeting")
     },
     async (args) => {
-      console.log("Attempting to create scheduled bot", args)
+      console.log("Attempting to create scheduled bot", redactArgs(args))
       const result = await baasClient.createScheduledBot(args)
       if (!result.success) {
         console.error("Failed to create scheduled bot", result.error)
@@ -338,7 +376,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Create a new calendar connection. Use this when you want to: 1) Set up automatic meeting recordings 2) Configure calendar-based bot scheduling 3) Enable recurring meeting coverage",
     V2ZodCalendars.createCalendarConnectionBody.shape,
     async (args) => {
-      console.log("Attempting to create calendar connection", args)
+      console.log("Attempting to create calendar connection", redactArgs(args))
       const result = await baasClient.createCalendarConnection(args)
       if (!result.success) {
         console.error("Failed to create calendar connection", result.error)
@@ -408,7 +446,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     },
     async (args) => {
       const { calendar_id, ...body } = args
-      console.log("Attempting to update calendar connection", args)
+      console.log("Attempting to update calendar connection", redactArgs(args))
       const result = await baasClient.updateCalendarConnection({ calendar_id, body })
       if (!result.success) {
         console.error("Failed to update calendar connection", result.error)
@@ -534,8 +572,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       ...botConfigShape
     },
     async (args) => {
+      if (!args.all_occurrences && !args.event_id) {
+        return {
+          content: [{ type: "text" as const, text: "event_id is required when all_occurrences is false" }],
+          isError: true
+        }
+      }
       const { calendar_id, ...body } = args
-      console.log("Attempting to create calendar bot", args)
+      console.log("Attempting to create calendar bot", redactArgs(args))
       const result = await baasClient.createCalendarBot({ calendar_id, body })
       if (!result.success) {
         console.error("Failed to create calendar bot", result.error)
@@ -573,6 +617,103 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       }
       return {
         content: [{ type: "text" as const, text: `Successfully deleted calendar bot: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // --- AI Agent Tools ---
+
+  // Get Transcript
+  server.tool(
+    "getTranscript",
+    "Get a meeting transcript as a readable dialog or full JSON with metadata. Use this when you want to: 1) Read what was said in a meeting 2) Get a conversation summary 3) Access raw transcription data",
+    {
+      bot_id: z.string(),
+      format: z.enum(["dialog", "full"]).default("dialog").describe("'dialog' returns a readable merged conversation, 'full' returns the raw transcription JSON")
+    },
+    async (args) => {
+      console.log("Attempting to get transcript", { bot_id: args.bot_id, format: args.format })
+
+      // 1. Get bot details for metadata and transcription URL
+      const botResult = await baasClient.getBotDetails({ bot_id: args.bot_id })
+      if (!botResult.success) {
+        console.error("Failed to get bot details", botResult.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to get bot details: ${botResult.error}` }],
+          isError: true
+        }
+      }
+
+      const bot = botResult.data as any
+      const transcriptionUrl = bot.transcription
+      if (!transcriptionUrl) {
+        return {
+          content: [{ type: "text" as const, text: "No transcription available for this bot. The meeting may still be in progress or transcription was not enabled." }]
+        }
+      }
+
+      // 2. Fetch transcription JSON from S3
+      let transcriptionData: any
+      try {
+        const response = await axios.get(transcriptionUrl)
+        transcriptionData = response.data
+      } catch (err: any) {
+        console.error("Failed to fetch transcription", err.message)
+        return {
+          content: [{ type: "text" as const, text: `Failed to fetch transcription: ${err.message}` }],
+          isError: true
+        }
+      }
+
+      // 3a. Full format — return raw JSON
+      if (args.format === "full") {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(transcriptionData, null, 2) }]
+        }
+      }
+
+      // 3b. Dialog format — parse and merge utterances
+      const utterances = extractUtterances(transcriptionData)
+      if (!utterances || utterances.length === 0) {
+        return {
+          content: [{ type: "text" as const, text: "Transcription data found but no utterances could be extracted. Try format: \"full\" to inspect the raw data." }]
+        }
+      }
+
+      // Merge consecutive same-speaker utterances
+      const merged: { speaker: string; text: string }[] = []
+      for (const u of utterances) {
+        const speaker = u.speaker ?? "Unknown"
+        const text = (u.text ?? "").trim()
+        if (!text) continue
+        const last = merged[merged.length - 1]
+        if (last && last.speaker === speaker) {
+          last.text += ` ${text}`
+        } else {
+          merged.push({ speaker, text })
+        }
+      }
+
+      // Build header
+      const durationMin = bot.duration_seconds ? Math.round(bot.duration_seconds / 60) : null
+      const speakerNames = bot.speakers
+        ? (bot.speakers as any[]).map((s: any) => s.name).join(", ")
+        : [...new Set(merged.map(m => m.speaker))].join(", ")
+
+      let header = `Transcript: ${bot.bot_name ?? args.bot_id}`
+      if (bot.created_at || durationMin) {
+        const parts: string[] = []
+        if (bot.created_at) parts.push(`Date: ${bot.created_at}`)
+        if (durationMin) parts.push(`Duration: ${durationMin} min`)
+        header += `\n${parts.join(" | ")}`
+      }
+      if (speakerNames) header += `\nSpeakers: ${speakerNames}`
+      header += "\n---"
+
+      const body = merged.map(m => `${m.speaker}: ${m.text}`).join("\n\n")
+
+      return {
+        content: [{ type: "text" as const, text: `${header}\n${body}` }]
       }
     }
   )
