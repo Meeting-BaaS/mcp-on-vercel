@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   '@meeting-baas/sdk':
-    specifier: ^6.1.0
-    version: 6.1.0
+    specifier: ^6.1.1
+    version: 6.1.1
   '@modelcontextprotocol/sdk':
     specifier: ^1.10.2
     version: 1.10.2
@@ -400,8 +400,8 @@ packages:
       '@jridgewell/sourcemap-codec': 1.5.0
     dev: true
 
-  /@meeting-baas/sdk@6.1.0:
-    resolution: {integrity: sha512-zPDW7zgxZwpW1nXy+NkqO5sbbN5ctl2Lewr9PdRXrBmLIBVUnm3eWS5ruDlR4HveffD+DC/+cfjlGwunz5CZTQ==}
+  /@meeting-baas/sdk@6.1.1:
+    resolution: {integrity: sha512-Pg8XKfjDRANpmxb6OUXd/GxV7d7ynSB7TIjiofc6ZHlyPeNzYsv8oPq+Lp4tb5pBm+K3L1aWkcsYe8QQBdA4Iw==}
     engines: {node: '>=18.0.0'}
     dependencies:
       axios: 1.14.0
@@ -695,7 +695,7 @@ packages:
   /axios@1.14.0:
     resolution: {integrity: sha512-3Y8yrqLSwjuzpXuZ0oIYZ/XGgLwUIBU3uLvbcpb0pidD9ctpShJd43KSlEEkVQg6DS0G9NKyzOvBfUtDKEyHvQ==}
     dependencies:
-      follow-redirects: 1.15.11
+      follow-redirects: 1.16.0
       form-data: 4.0.5
       proxy-from-env: 2.1.0
     transitivePeerDependencies:
@@ -1059,8 +1059,8 @@ packages:
       - supports-color
     dev: false
 
-  /follow-redirects@1.15.11:
-    resolution: {integrity: sha512-deG2P0JfjrTxl50XGCDyfI97ZGVCxIpfKYmfyrQ54n5FO/0gfIES8C/Psl6kWVDolizcaaxZJnTS0QSMxvnsBQ==}
+  /follow-redirects@1.15.9:
+    resolution: {integrity: sha512-gew4GsXizNgdoRyqmyfMHyAmXsZDk6mHkSxZFCzW9gwlbtOW44CDtYavM+y+72qD/Vq2l550kMF52DT8fOLJqQ==}
     engines: {node: '>=4.0'}
     peerDependencies:
       debug: '*'
@@ -1069,8 +1069,8 @@ packages:
         optional: true
     dev: false
 
-  /follow-redirects@1.15.9:
-    resolution: {integrity: sha512-gew4GsXizNgdoRyqmyfMHyAmXsZDk6mHkSxZFCzW9gwlbtOW44CDtYavM+y+72qD/Vq2l550kMF52DT8fOLJqQ==}
+  /follow-redirects@1.16.0:
+    resolution: {integrity: sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==}
     engines: {node: '>=4.0'}
     peerDependencies:
       debug: '*'
