@@ -10,13 +10,3 @@ export const getApiUrl = (environment: string | null) => {
   }
   return `https://api.${BASE_DOMAIN}`
 }
-
-export const getRedisUrl = () => {
-  const redisUrl = process.env.REDIS_URL
-
-  if (!redisUrl) {
-    throw new Error("REDIS_URL environment variable is not set")
-  }
-
-  return redisUrl
-}

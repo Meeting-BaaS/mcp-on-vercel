@@ -4,14 +4,56 @@
 
 This is the main MCP (Model Context Protocol) server powering [chat.meetingbaas.com](https://chat.meetingbaas.com), providing the LLM integration and AI capabilities for the Meeting BaaS chat interface. It's a fork of the [Vercel MCP template](https://github.com/vercel-labs/mcp-on-vercel) with Meeting BaaS-specific modifications.
 
-**Note:** This fork can be deployed on a traditional server. To deploy on Vercel, you must recreate a `vercel.json` file.
+The server exposes a single **Streamable HTTP** endpoint at `/mcp`. No Redis or SSE transport required.
 
-The server implements the Model Context Protocol (MCP) that integrates with Meeting BaaS services, enabling:
+## Quick Start
 
-- AI-powered chat interactions
-- Meeting automation through LLMs
-- Intelligent bot management
-- Calendar integration with AI assistance
+```bash
+# Install dependencies
+pnpm install
+
+# Create .env
+cat > .env <<EOF
+NODE_ENV=production
+PORT=3011
+BAAS_URL=meetingbaas.com
+EOF
+
+# Build and run
+pnpm local:build
+pnpm local:start
+```
+
+The server is now listening on `http://localhost:3011/mcp`.
+
+## Connect from Claude Code
+
+```bash
+claude mcp add meeting-baas \
+  --transport http \
+  http://localhost:3011/mcp \
+  --header "x-api-version: v2" \
+  --header "x-meeting-baas-api-key: YOUR_API_KEY"
+```
+
+Or add it manually to `~/.claude.json` under `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "meeting-baas": {
+      "type": "http",
+      "url": "http://localhost:3011/mcp",
+      "headers": {
+        "x-api-version": "v2",
+        "x-meeting-baas-api-key": "YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Code and the Meeting BaaS tools will appear.
 
 ## Features
 
@@ -33,14 +75,11 @@ This project uses the official Meeting BaaS SDK (`@meeting-baas/sdk`) which prov
 
 ## Environment Variables
 
-The following environment variables are required:
-
-- `REDIS_URL`: URL to your Redis instance (required for session management)
-
 Optional environment variables:
 
 - `NODE_ENV`: Set to `"development"` to enable development mode.
 - `PORT`: Port the server listens on (default: `3000`).
+- `BAAS_URL`: Base domain for the Meeting BaaS API (default: `meetingbaas.com`).
 - `BAAS_API_KEY`: Meeting BaaS API key (development mode only).
 
 ## Authentication
@@ -53,47 +92,17 @@ The server supports multiple ways to provide the Meeting BaaS API key:
    - `x-api-key`
    - `Authorization` (as a Bearer token)
 
-2. Request body (for POST requests):
-
-   ```json
-   {
-     "apiKey": "your-api-key"
-   }
-   ```
-
-3. Environment variable (development mode only):
+2. Environment variable (development mode only):
 
    ```bash
    BAAS_API_KEY=your-api-key
    ```
 
-Note: In production, the API key should be provided through request headers or body. The environment variable is only used in development mode for testing purposes.
+Note: In production, the API key should be provided through request headers. The environment variable is only used in development mode for testing purposes.
 
-## Usage
+## API Version
 
-Update `api/server.ts` with your tools, prompts, and resources following the [MCP TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
-
-[There is also a Next.js version of this template](https://vercel.com/templates/next.js/model-context-protocol-mcp-with-next-js)
-
-## Notes for running on Vercel
-
-- Requires a Redis attached to the project under `process.env.REDIS_URL`
-- Make sure you have [Fluid compute](https://vercel.com/docs/functions/fluid-compute) enabled for efficient execution
-- After enabling Fluid compute, create a `vercel.json` and set `maxDuration` to `800` if you are using a Vercel Pro or Enterprise account.
-- An example of `vercel.json`:
-
-````json
-{
-  "rewrites": [{ "source": "/(.+)", "destination": "/api/server" }],
-  "functions": {
-    "api/server.ts": {
-      "maxDuration": 800
-    }
-  }
-}
-````
-
-- [Deploy the MCP template](https://vercel.com/templates/other/model-context-protocol-mcp-with-vercel-functions)
+Set the `x-api-version` header to `v1` or `v2` to choose the API version. Default is `v1`. The v2 API provides additional bot management, scheduled bots, and calendar connection tools.
 
 ## Meeting BaaS Integration
 
@@ -117,23 +126,6 @@ This fork includes several Meeting BaaS-specific tools:
 - List and monitor active bots
 - Get detailed bot metadata
 - Manage bot configurations
-
-## Sample Client
-
-`script/test-client.mjs` contains a sample client to try invocations.
-
-```sh
-node scripts/test-client.mjs https://mcp-on-vercel.vercel.app
-```
-
-## Differences from Original Template
-
-This fork adds:
-
-1. Meeting BaaS SDK integration
-2. Enhanced bot management capabilities
-3. Calendar integration features
-4. Improved error handling and logging
 
 ## Contributing
 

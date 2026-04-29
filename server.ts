@@ -32,9 +32,7 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
 server.listen(PORT, () => {
   console.log(`MCP Server running on port ${PORT}`)
   console.log("Available endpoints:")
-  console.log("  - GET/POST /mcp - MCP protocol endpoint")
-  console.log("  - GET /sse - Server-Sent Events endpoint")
-  console.log("  - POST /message - Message handling endpoint")
+  console.log("  - POST /mcp - MCP Streamable HTTP endpoint")
 })
 
 // Graceful shutdown
