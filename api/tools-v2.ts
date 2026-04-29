@@ -55,9 +55,9 @@ const zoomConfigSchema = z.object({
 
 /** Core bot creation fields shared by createBot, createScheduledBot, and createCalendarBot. */
 const botConfigShape = {
-  bot_name: z.string().min(1).max(255),
+  bot_name: z.string().min(1).max(255).default("Meeting BaaS Bot"),
   meeting_url: z.string(),
-  bot_image: z.string().optional(),
+  bot_image: z.string().default("https://branding-template.s3.fr-par.scw.cloud/branding_template.png").optional(),
   recording_mode: z.enum(["speaker_view", "gallery_view", "audio_only"]).optional(),
   allow_multiple_bots: z.boolean().optional(),
   entry_message: z.string().max(500).optional(),
@@ -66,7 +66,7 @@ const botConfigShape = {
   zoom_config: zoomConfigSchema,
   streaming_enabled: z.boolean().optional(),
   streaming_config: streamingConfigSchema,
-  transcription_enabled: z.boolean().optional(),
+  transcription_enabled: z.boolean().default(true).optional(),
   transcription_config: transcriptionConfigSchema,
   callback_enabled: z.boolean().optional(),
   callback_config: callbackConfigSchema,
@@ -151,7 +151,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // Create Bot (equivalent to v1 joinMeeting)
   server.tool(
     "createBot",
-    "Create and send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech, and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
+    "Create and send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
     botConfigShape,
     async (args) => {
       console.log("Attempting to create bot", redactArgs(args))
