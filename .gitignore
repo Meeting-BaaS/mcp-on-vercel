@@ -7,3 +7,6 @@ node_modules
 /dist/
 
 package-lock.json
+
+scripts/deploy.sh
+Dockerfile
