@@ -24,7 +24,7 @@
             pnpmDeps = pkgs.pnpm_8.fetchDeps {
               inherit (finalAttrs) pname version src;
               fetcherVersion = 2;
-              hash = nixpkgs.lib.fakeHash;
+              hash = "sha256-5gnYKOFqxdkk/QjtPp1YkMVN0mLY6x3bW6q4GnKNOA8=";
             };
             env = { CI = "true"; };
             buildPhase = ''
