@@ -46,12 +46,17 @@ const callbackConfigSchema = z.object({
 const timeoutConfigSchema = z.object({
   waiting_room_timeout: z.number().optional(),
   silence_timeout: z.number().optional(),
-  no_one_joined_timeout: z.number().optional()
+  no_one_joined_timeout: z.number().optional(),
+  // grace_period added in @meeting-baas/sdk 6.1.x — extra time the bot waits
+  // before leaving after a timeout condition is met.
+  grace_period: z.number().optional()
 }).optional()
 
 const zoomConfigSchema = z.object({
   credential_id: z.string().optional()
 }).optional()
+
+const chatMessageSchema = z.string().min(1).max(500)
 
 /** Core bot creation fields shared by createBot, createScheduledBot, and createCalendarBot. */
 const botConfigShape = {
@@ -73,39 +78,45 @@ const botConfigShape = {
   deduplication_key: z.string().optional()
 }
 
-// ---------------------------------------------------------------------------
-// V2 Endpoints not yet exposed as MCP tools:
-//
-// Bot Management:
-//   - batchCreateBots         (batch create multiple bots)
-//   - getBotScreenshots       (get screenshots from a bot session)
-//   - resendFinalWebhook      (resend the final webhook for a bot)
-//   - retryCallback           (retry callback for a bot)
-//   - updateBotConfig         (update a running bot's extra metadata)
-//
-// Scheduled Bots:
-//   - batchCreateScheduledBots (batch create scheduled bots)
-//   - updateScheduledBot       (update a scheduled bot's configuration)
-//
-// Calendar:
-//   - resubscribeCalendar     (resubscribe calendar push notifications)
-//   - listRawCalendars        (list raw calendars from OAuth provider)
-//   - listEventSeries         (list recurring event series)
-//   - updateCalendarBot       (update a calendar bot configuration)
-//
-// Zoom Credentials:
-//   - createZoomCredential    (store Zoom OAuth credentials)
-//   - listZoomCredentials     (list stored Zoom credentials)
-//   - getZoomCredential       (get a specific Zoom credential)
-//   - updateZoomCredential    (update a Zoom credential)
-//   - deleteZoomCredential    (delete a Zoom credential)
-// ---------------------------------------------------------------------------
+/**
+ * Optional-everywhere variant of botConfigShape, used by update endpoints
+ * (updateScheduledBot, updateCalendarBot) where every field is a patch.
+ */
+const botUpdateShape = {
+  bot_name: z.string().min(1).max(255).optional(),
+  meeting_url: z.string().optional(),
+  bot_image: z.string().optional(),
+  recording_mode: z.enum(["speaker_view", "gallery_view", "audio_only"]).optional(),
+  allow_multiple_bots: z.boolean().optional(),
+  entry_message: z.string().max(500).optional(),
+  extra: z.record(z.unknown()).optional(),
+  timeout_config: timeoutConfigSchema,
+  zoom_config: zoomConfigSchema,
+  streaming_enabled: z.boolean().optional(),
+  streaming_config: streamingConfigSchema,
+  transcription_enabled: z.boolean().optional(),
+  transcription_config: transcriptionConfigSchema,
+  callback_enabled: z.boolean().optional(),
+  callback_config: callbackConfigSchema,
+  deduplication_key: z.string().optional()
+}
+
+/** Zoom OAuth credential fields shared by createZoomCredential / updateZoomCredential. */
+const zoomCredentialShape = {
+  name: z.string().min(1).max(100),
+  client_id: z.string(),
+  client_secret: z.string(),
+  authorization_code: z.string().optional(),
+  redirect_uri: z.string().optional(),
+  extra: z.record(z.unknown()).optional()
+}
 
 /** Strip sensitive fields before logging. Only keeps IDs, names, and status-like keys. */
 function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
   const sensitiveKeys = new Set([
     "api_key", "oauth_client_secret", "oauth_refresh_token",
-    "secret", "input_url", "output_url", "meeting_url"
+    "secret", "input_url", "output_url", "meeting_url",
+    "client_secret", "authorization_code"
   ])
   const redacted: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(args)) {
@@ -279,6 +290,195 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     }
   )
 
+  // Batch Create Bots
+  server.tool(
+    "batchCreateBots",
+    "Create multiple bots in a single request. Use this when you want to: 1) Send bots to several meetings at once 2) Bulk-record a set of meetings 3) Reduce round-trips when scheduling many bots",
+    { bots: z.array(z.object(botConfigShape)).min(1).describe("Array of bot configurations to create") },
+    async (args) => {
+      console.log("Attempting to batch create bots", { count: args.bots.length })
+      const result = await baasClient.batchCreateBots(args.bots)
+      if (!result.success) {
+        console.error("Failed to batch create bots", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to batch create bots: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, errors: result.errors }, null, 2) }]
+      }
+    }
+  )
+
+  // Get Bot Screenshots
+  server.tool(
+    "getBotScreenshots",
+    "Get screenshots captured during a bot session. Use this when you want to: 1) Verify what the bot saw in the meeting 2) Inspect the meeting visually 3) Debug a recording",
+    {
+      bot_id: z.string(),
+      limit: z.number().optional(),
+      cursor: z.string().optional()
+    },
+    async (args) => {
+      console.log("Attempting to get bot screenshots", args)
+      const result = await baasClient.getBotScreenshots(args)
+      if (!result.success) {
+        console.error("Failed to get bot screenshots", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to get bot screenshots: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, cursor: result.cursor }, null, 2) }]
+      }
+    }
+  )
+
+  // Resend Final Webhook
+  server.tool(
+    "resendFinalWebhook",
+    "Resend the final webhook for a completed bot. Use this when you want to: 1) Recover from a missed webhook 2) Re-trigger downstream processing 3) Replay the end-of-meeting notification",
+    { bot_id: z.string() },
+    async (args) => {
+      console.log("Attempting to resend final webhook", args)
+      const result = await baasClient.resendFinalWebhook({ bot_id: args.bot_id })
+      if (!result.success) {
+        console.error("Failed to resend final webhook", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to resend final webhook: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully resent final webhook: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // Retry Callback
+  server.tool(
+    "retryCallback",
+    "Retry the callback for a bot, optionally overriding the callback configuration. Use this when you want to: 1) Re-deliver a failed callback 2) Point a callback at a new URL 3) Recover from a callback outage",
+    {
+      bot_id: z.string(),
+      callback_config: callbackConfigSchema
+    },
+    async (args) => {
+      console.log("Attempting to retry callback", redactArgs(args))
+      const result = await baasClient.retryCallback({ bot_id: args.bot_id, callbackConfig: args.callback_config })
+      if (!result.success) {
+        console.error("Failed to retry callback", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to retry callback: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully retried callback: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // Update Bot Config
+  server.tool(
+    "updateBotConfig",
+    "Update a running bot's extra metadata (shallow-merged with existing data). Use this when you want to: 1) Attach metadata to a live bot 2) Tag a recording in progress 3) Correlate a bot with external records",
+    {
+      bot_id: z.string(),
+      extra: z.record(z.unknown()).describe("Custom metadata to merge with the bot's existing extra data")
+    },
+    async (args) => {
+      console.log("Attempting to update bot config", { bot_id: args.bot_id })
+      const result = await baasClient.updateBotConfig({ bot_id: args.bot_id, body: { extra: args.extra } })
+      if (!result.success) {
+        console.error("Failed to update bot config", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to update bot config: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully updated bot config: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // Send Chat Message
+  server.tool(
+    "sendChatMessage",
+    "Send a chat message into the meeting via the bot. Use this when you want to: 1) Post a message to participants 2) Share a link or instruction 3) Acknowledge something in the meeting chat",
+    {
+      bot_id: z.string(),
+      message: chatMessageSchema.describe("The chat message text to send in the meeting (1-500 chars)")
+    },
+    async (args) => {
+      console.log("Attempting to send chat message", { bot_id: args.bot_id })
+      const result = await baasClient.sendChatMessage({ bot_id: args.bot_id, body: { message: args.message } })
+      if (!result.success) {
+        console.error("Failed to send chat message", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to send chat message: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: "Successfully sent chat message" }]
+      }
+    }
+  )
+
+  // Pause Bot Recording
+  server.tool(
+    "pauseBotRecording",
+    "Pause an in-progress recording for a live bot, optionally posting a chat message to participants. Use this when you want to: 1) Temporarily stop recording sensitive discussion 2) Pause during a break 3) Control recording without removing the bot",
+    {
+      bot_id: z.string(),
+      chat_message: chatMessageSchema.optional().describe("Optional message to post to participants when pausing")
+    },
+    async (args) => {
+      console.log("Attempting to pause bot recording", { bot_id: args.bot_id })
+      const body = args.chat_message ? { chat_message: args.chat_message } : undefined
+      const result = await baasClient.pauseBotRecording({ bot_id: args.bot_id, body })
+      if (!result.success) {
+        console.error("Failed to pause bot recording", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to pause bot recording: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully paused bot recording: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // Resume Bot Recording
+  server.tool(
+    "resumeBotRecording",
+    "Resume a paused recording for a live bot, optionally posting a chat message to participants. Use this when you want to: 1) Continue recording after a pause 2) Resume after a break 3) Re-enable capture without re-joining",
+    {
+      bot_id: z.string(),
+      chat_message: chatMessageSchema.optional().describe("Optional message to post to participants when resuming")
+    },
+    async (args) => {
+      console.log("Attempting to resume bot recording", { bot_id: args.bot_id })
+      const body = args.chat_message ? { chat_message: args.chat_message } : undefined
+      const result = await baasClient.resumeBotRecording({ bot_id: args.bot_id, body })
+      if (!result.success) {
+        console.error("Failed to resume bot recording", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to resume bot recording: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully resumed bot recording: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
   // --- Scheduled Bots ---
 
   // Create Scheduled Bot
@@ -364,6 +564,58 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       }
       return {
         content: [{ type: "text" as const, text: "Successfully deleted scheduled bot" }]
+      }
+    }
+  )
+
+  // Batch Create Scheduled Bots
+  server.tool(
+    "batchCreateScheduledBots",
+    "Schedule multiple bots in a single request. Use this when you want to: 1) Pre-schedule recordings for many meetings at once 2) Bulk-automate future attendance 3) Reduce round-trips when scheduling",
+    {
+      bots: z.array(z.object({
+        ...botConfigShape,
+        join_at: z.string().describe("ISO8601 timestamp for when the bot should join the meeting")
+      })).min(1).describe("Array of scheduled bot configurations")
+    },
+    async (args) => {
+      console.log("Attempting to batch create scheduled bots", { count: args.bots.length })
+      const result = await baasClient.batchCreateScheduledBots(args.bots)
+      if (!result.success) {
+        console.error("Failed to batch create scheduled bots", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to batch create scheduled bots: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, errors: result.errors }, null, 2) }]
+      }
+    }
+  )
+
+  // Update Scheduled Bot
+  server.tool(
+    "updateScheduledBot",
+    "Update the configuration of a scheduled bot before it joins. Use this when you want to: 1) Change a scheduled bot's settings 2) Update the meeting URL 3) Adjust recording or timeout options",
+    {
+      bot_id: z.string(),
+      ...botUpdateShape,
+      join_at: z.string().optional().describe("ISO8601 timestamp for when the bot should join the meeting")
+    },
+    async (args) => {
+      const { bot_id, ...body } = args
+      console.log("Attempting to update scheduled bot", redactArgs(args))
+      const result = await baasClient.updateScheduledBot({ bot_id, body })
+      if (!result.success) {
+        console.error("Failed to update scheduled bot", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to update scheduled bot: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully updated scheduled bot: ${JSON.stringify(result.data, null, 2)}` }]
       }
     }
   )
@@ -503,6 +755,54 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     }
   )
 
+  // Resubscribe Calendar
+  server.tool(
+    "resubscribeCalendar",
+    "Resubscribe a calendar's push notifications. Use this when you want to: 1) Restore event updates after a subscription lapses 2) Recover from missed calendar webhooks 3) Refresh the provider subscription",
+    { calendar_id: z.string() },
+    async (args) => {
+      console.log("Attempting to resubscribe calendar", args)
+      const result = await baasClient.resubscribeCalendar({ calendar_id: args.calendar_id })
+      if (!result.success) {
+        console.error("Failed to resubscribe calendar", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to resubscribe calendar: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully resubscribed calendar: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // List Raw Calendars
+  server.tool(
+    "listRawCalendars",
+    "List the raw calendars available from an OAuth provider before creating a connection. Use this when you want to: 1) Discover which calendars an account exposes 2) Find a calendar's id to connect 3) Verify OAuth credentials work",
+    {
+      calendar_platform: z.enum(["google", "microsoft"]).describe("The calendar platform: 'google' or 'microsoft'"),
+      oauth_client_id: z.string(),
+      oauth_client_secret: z.string(),
+      oauth_refresh_token: z.string(),
+      oauth_tenant_id: z.string().optional()
+    },
+    async (args) => {
+      console.log("Attempting to list raw calendars", redactArgs(args))
+      const result = await baasClient.listRawCalendars(args)
+      if (!result.success) {
+        console.error("Failed to list raw calendars", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to list raw calendars: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result.data, null, 2) }]
+      }
+    }
+  )
+
   // --- Calendar Events ---
 
   // List Events
@@ -554,6 +854,34 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       }
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result.data, null, 2) }]
+      }
+    }
+  )
+
+  // List Event Series
+  server.tool(
+    "listEventSeries",
+    "List recurring event series for a calendar. Use this when you want to: 1) Find recurring meetings 2) Schedule a bot across all occurrences of a series 3) Browse repeating calendar entries",
+    {
+      calendar_id: z.string(),
+      limit: z.number().optional(),
+      cursor: z.string().optional(),
+      event_type: z.string().optional(),
+      show_cancelled: z.boolean().optional()
+    },
+    async (args) => {
+      const { calendar_id, ...query } = args
+      console.log("Attempting to list event series", args)
+      const result = await baasClient.listEventSeries({ calendar_id, query })
+      if (!result.success) {
+        console.error("Failed to list event series", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to list event series: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ data: result.data, cursor: result.cursor }, null, 2) }]
       }
     }
   )
@@ -617,6 +945,158 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       }
       return {
         content: [{ type: "text" as const, text: `Successfully deleted calendar bot: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // Update Calendar Bot
+  server.tool(
+    "updateCalendarBot",
+    "Update the configuration of a bot scheduled for a calendar event. Use this when you want to: 1) Change recording settings for a scheduled calendar bot 2) Adjust bot options before the event 3) Modify a calendar-driven recording",
+    {
+      calendar_id: z.string(),
+      event_id: z.string().describe("UUID of the event instance whose bot configuration is being updated"),
+      series_id: z.string().describe("UUID of the event series the bot is scheduled for"),
+      all_occurrences: z.boolean().describe("Whether the update applies to all occurrences of the event series"),
+      ...botUpdateShape
+    },
+    async (args) => {
+      const { calendar_id, event_id, ...body } = args
+      console.log("Attempting to update calendar bot", redactArgs(args))
+      const result = await baasClient.updateCalendarBot({ calendar_id, event_id, body })
+      if (!result.success) {
+        console.error("Failed to update calendar bot", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to update calendar bot: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully updated calendar bot: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // --- Zoom Credentials ---
+
+  // Create Zoom Credential
+  server.tool(
+    "createZoomCredential",
+    "Store Zoom OAuth credentials for joining Zoom meetings with the Meeting SDK. Use this when you want to: 1) Enable Zoom SDK-based recording 2) Register a Zoom app's client credentials 3) Set up Zoom authentication",
+    zoomCredentialShape,
+    async (args) => {
+      console.log("Attempting to create zoom credential", redactArgs(args))
+      const result = await baasClient.createZoomCredential(args)
+      if (!result.success) {
+        console.error("Failed to create zoom credential", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to create zoom credential: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully created zoom credential: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // List Zoom Credentials
+  server.tool(
+    "listZoomCredentials",
+    "List stored Zoom credentials. Use this when you want to: 1) View configured Zoom apps 2) Find a credential id 3) Audit Zoom integration settings",
+    {
+      name: z.string().optional(),
+      zoom_email: z.string().optional(),
+      zoom_display_name: z.string().optional(),
+      zoom_user_id: z.string().optional(),
+      credential_type: z.string().optional(),
+      state: z.string().optional(),
+      extra: z.string().optional()
+    },
+    async (args) => {
+      console.log("Attempting to list zoom credentials", args)
+      const result = await baasClient.listZoomCredentials(args)
+      if (!result.success) {
+        console.error("Failed to list zoom credentials", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to list zoom credentials: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result.data, null, 2) }]
+      }
+    }
+  )
+
+  // Get Zoom Credential
+  server.tool(
+    "getZoomCredential",
+    "Get details about a specific Zoom credential. Use this when you want to: 1) Inspect a stored Zoom credential 2) Verify its configuration 3) Check the linked Zoom account",
+    { id: z.string() },
+    async (args) => {
+      console.log("Attempting to get zoom credential", args)
+      const result = await baasClient.getZoomCredential({ id: args.id })
+      if (!result.success) {
+        console.error("Failed to get zoom credential", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to get zoom credential: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result.data, null, 2) }]
+      }
+    }
+  )
+
+  // Update Zoom Credential
+  server.tool(
+    "updateZoomCredential",
+    "Update a stored Zoom credential. Use this when you want to: 1) Rotate Zoom client secrets 2) Rename a credential 3) Re-authorize with a new authorization code",
+    {
+      id: z.string(),
+      name: z.string().min(1).max(100).optional(),
+      client_id: z.string().optional(),
+      client_secret: z.string().optional(),
+      authorization_code: z.string().optional(),
+      redirect_uri: z.string().optional(),
+      extra: z.record(z.unknown()).optional()
+    },
+    async (args) => {
+      const { id, ...body } = args
+      console.log("Attempting to update zoom credential", redactArgs(args))
+      const result = await baasClient.updateZoomCredential({ id, body })
+      if (!result.success) {
+        console.error("Failed to update zoom credential", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to update zoom credential: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: `Successfully updated zoom credential: ${JSON.stringify(result.data, null, 2)}` }]
+      }
+    }
+  )
+
+  // Delete Zoom Credential
+  server.tool(
+    "deleteZoomCredential",
+    "Delete a stored Zoom credential. Use this when you want to: 1) Remove an unused Zoom credential 2) Revoke a compromised credential 3) Clean up Zoom integration settings",
+    { id: z.string() },
+    async (args) => {
+      console.log("Attempting to delete zoom credential", args)
+      const result = await baasClient.deleteZoomCredential({ id: args.id })
+      if (!result.success) {
+        console.error("Failed to delete zoom credential", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to delete zoom credential: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: "Successfully deleted zoom credential" }]
       }
     }
   )

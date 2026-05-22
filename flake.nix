@@ -24,7 +24,7 @@
             pnpmDeps = (pkgs.fetchPnpmDeps.override { pnpm = pkgs.pnpm_8; }) {
               inherit (finalAttrs) pname version src;
               fetcherVersion = 2;
-              hash = "sha256-5gnYKOFqxdkk/QjtPp1YkMVN0mLY6x3bW6q4GnKNOA8=";
+              hash = "sha256-TyYTp7GHuJcMhvLhm8B40BkjgLg5U9Xd6vHsT2Ij5k0=";
             };
             env = { CI = "true"; };
             buildPhase = ''
