@@ -58,11 +58,27 @@ const zoomConfigSchema = z.object({
 
 const chatMessageSchema = z.string().min(1).max(500)
 
+// Bot avatar image(s). Accepts a single HTTPS URL or an array of up to 5
+// (JPEG/PNG/WebP). Multiple images are cycled per botImageConfigSchema.
+const botImageSchema = z.union([
+  z.string(),
+  z.array(z.string()).min(1).max(5)
+]).optional()
+
+// Controls how multiple bot avatar images are displayed.
+//   - auto:        cycle through images every image_duration seconds.
+//   - bot_status:  image 1 on join, 2 when recording, 3 when paused (first 3 only).
+const botImageConfigSchema = z.object({
+  loop_mode: z.enum(["auto", "bot_status"]).optional(),
+  image_duration: z.number().min(10).max(120).optional()
+}).optional()
+
 /** Core bot creation fields shared by createBot, createScheduledBot, and createCalendarBot. */
 const botConfigShape = {
   bot_name: z.string().min(1).max(255).default("Meeting BaaS Bot"),
   meeting_url: z.string(),
-  bot_image: z.string().optional().default("https://branding-template.s3.fr-par.scw.cloud/branding_template.png"),
+  bot_image: z.union([z.string(), z.array(z.string()).min(1).max(5)]).optional().default("https://branding-template.s3.fr-par.scw.cloud/branding_template.png"),
+  bot_image_config: botImageConfigSchema,
   recording_mode: z.enum(["speaker_view", "gallery_view", "audio_only"]).optional(),
   allow_multiple_bots: z.boolean().optional(),
   entry_message: z.string().max(500).optional(),
@@ -85,7 +101,8 @@ const botConfigShape = {
 const botUpdateShape = {
   bot_name: z.string().min(1).max(255).optional(),
   meeting_url: z.string().optional(),
-  bot_image: z.string().optional(),
+  bot_image: botImageSchema,
+  bot_image_config: botImageConfigSchema,
   recording_mode: z.enum(["speaker_view", "gallery_view", "audio_only"]).optional(),
   allow_multiple_bots: z.boolean().optional(),
   entry_message: z.string().max(500).optional(),
