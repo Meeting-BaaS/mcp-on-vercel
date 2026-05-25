@@ -87,7 +87,10 @@ const botConfigShape = {
   zoom_config: zoomConfigSchema,
   streaming_enabled: z.boolean().optional(),
   streaming_config: streamingConfigSchema,
-  transcription_enabled: z.boolean().default(true).optional(),
+  // .optional().default(true) order matters: ZodOptional must wrap ZodDefault so
+  // an omitted field still resolves to true (the reverse order short-circuits to
+  // undefined, and the API's own default is false — i.e. transcription off).
+  transcription_enabled: z.boolean().optional().default(true),
   transcription_config: transcriptionConfigSchema,
   callback_enabled: z.boolean().optional(),
   callback_config: callbackConfigSchema,
