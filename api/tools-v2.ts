@@ -7,7 +7,7 @@ import {
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp"
 import axios from "axios"
 import z from "zod"
-import { redactArgs, toErrorText } from "../lib/utils"
+import { redactArgs } from "../lib/utils"
 
 // Helper to get the v2 client type
 type V2Client = BaasClient<"v2">
