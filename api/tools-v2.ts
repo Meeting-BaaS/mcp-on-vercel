@@ -90,11 +90,28 @@ const botConfigShape = {
   // .optional().default(true) order matters: ZodOptional must wrap ZodDefault so
   // an omitted field still resolves to true (the reverse order short-circuits to
   // undefined, and the API's own default is false — i.e. transcription off).
+  // When enabled without a transcription_config, withTranscriptionDefaults
+  // supplies the default Gladia provider config the API requires.
   transcription_enabled: z.boolean().optional().default(true),
   transcription_config: transcriptionConfigSchema,
   callback_enabled: z.boolean().optional(),
   callback_config: callbackConfigSchema,
   deduplication_key: z.string().optional()
+}
+
+/**
+ * The v2 API rejects bot creation with `transcription_config is required when
+ * transcription_enabled is true`. transcription_enabled defaults to true (see
+ * botConfigShape), so supply a default Gladia config — the only supported
+ * provider — when the caller enables transcription without specifying one.
+ */
+function withTranscriptionDefaults<T extends { transcription_enabled?: boolean; transcription_config?: unknown }>(
+  args: T
+): T {
+  if (args.transcription_enabled !== false && !args.transcription_config) {
+    return { ...args, transcription_config: { provider: "gladia" as const } }
+  }
+  return args
 }
 
 /**
@@ -182,11 +199,11 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // Create Bot (equivalent to v1 joinMeeting)
   server.tool(
     "createBot",
-    "Create and send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
+    "Create and send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using the Gladia provider), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
     botConfigShape,
     async (args) => {
       console.log("Attempting to create bot", redactArgs(args))
-      const result = await baasClient.createBot(args)
+      const result = await baasClient.createBot(withTranscriptionDefaults(args))
       if (!result.success) {
         console.error("Failed to create bot", result.error)
         return {
@@ -317,7 +334,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     { bots: z.array(z.object(botConfigShape)).min(1).describe("Array of bot configurations to create") },
     async (args) => {
       console.log("Attempting to batch create bots", { count: args.bots.length })
-      const result = await baasClient.batchCreateBots(args.bots)
+      const result = await baasClient.batchCreateBots(args.bots.map(withTranscriptionDefaults))
       if (!result.success) {
         console.error("Failed to batch create bots", result.error)
         return {
@@ -511,7 +528,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     },
     async (args) => {
       console.log("Attempting to create scheduled bot", redactArgs(args))
-      const result = await baasClient.createScheduledBot(args)
+      const result = await baasClient.createScheduledBot(withTranscriptionDefaults(args))
       if (!result.success) {
         console.error("Failed to create scheduled bot", result.error)
         return {
@@ -600,7 +617,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     },
     async (args) => {
       console.log("Attempting to batch create scheduled bots", { count: args.bots.length })
-      const result = await baasClient.batchCreateScheduledBots(args.bots)
+      const result = await baasClient.batchCreateScheduledBots(args.bots.map(withTranscriptionDefaults))
       if (!result.success) {
         console.error("Failed to batch create scheduled bots", result.error)
         return {
@@ -928,7 +945,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       }
       const { calendar_id, ...body } = args
       console.log("Attempting to create calendar bot", redactArgs(args))
-      const result = await baasClient.createCalendarBot({ calendar_id, body })
+      const result = await baasClient.createCalendarBot({ calendar_id, body: withTranscriptionDefaults(body) })
       if (!result.success) {
         console.error("Failed to create calendar bot", result.error)
         return {
