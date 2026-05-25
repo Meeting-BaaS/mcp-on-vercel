@@ -20,6 +20,16 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
       return
     }
 
+    // Health endpoint for Kubernetes liveness/readiness probes. Must precede the
+    // MCP handler, which only accepts POST /mcp (GET /mcp returns 405) and 404s
+    // every other path — neither gives probes a 2xx.
+    const path = new URL(req.url || "", `http://${req.headers.host || "localhost"}`).pathname
+    if (req.method === "GET" && (path === "/health" || path === "/healthz")) {
+      res.writeHead(200, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ status: "ok" }))
+      return
+    }
+
     // Call the Vercel handler
     await handler(req, res)
   } catch (error) {
@@ -33,6 +43,7 @@ server.listen(PORT, () => {
   console.log(`MCP Server running on port ${PORT}`)
   console.log("Available endpoints:")
   console.log("  - POST /mcp - MCP Streamable HTTP endpoint")
+  console.log("  - GET  /health - Liveness/readiness probe")
 })
 
 // Graceful shutdown
