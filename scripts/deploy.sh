@@ -19,7 +19,11 @@ fi
 
 BEGIN_TS=$(date +%s)
 
-IMAGE_NAME=mcp-server
+# Must match the Helm chart's image.repository basename (mcp-on-vercel) so the
+# pushed image lands at <registry>/<namespace>/mcp-on-vercel:<tag>, where the
+# Kubernetes deployment pulls it from. Using a different name (e.g. mcp-server)
+# pushes successfully but leaves the pods in ImagePullBackOff.
+IMAGE_NAME=mcp-on-vercel
 
 get_image_repo() {
   if [ "${ENVIRON:-}" == "preprod" ]; then
