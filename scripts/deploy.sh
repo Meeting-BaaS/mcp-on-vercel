@@ -52,8 +52,7 @@ validate_environment() {
     exit 1
   fi
 
-  echo "[DEBUG] Using AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:0:4}****"
-  echo "[DEBUG] Using AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:0:4}****"
+  echo "[DEBUG] Scaleway credentials present (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY set)"
 
   if [ "${ENVIRON:-}" == "prod" ]; then
     echo "[WARNING] You are about to deploy to PRODUCTION!"
@@ -77,13 +76,19 @@ deploy() {
   local IMAGE_TAG=${DATE_TAG}-${GIT_HASH}
   local TARGET_PLATFORM="linux/${TARGET_ARCH}"
 
-  echo "[DEBUG] Building $IMAGE_NAME for platform: $TARGET_PLATFORM..."
-  if ! docker build \
-    --platform="$TARGET_PLATFORM" \
-    -f Dockerfile . \
-    --tag="$IMAGE_NAME:$IMAGE_TAG"; then
-    echo "[ERROR] Docker build failed. Aborting."
-    exit 1
+  # In --upload mode the image was already built locally (verified below); skip
+  # the build and only tag + push it.
+  if [[ "$MODE" != "upload" ]]; then
+    echo "[DEBUG] Building $IMAGE_NAME for platform: $TARGET_PLATFORM..."
+    if ! docker build \
+      --platform="$TARGET_PLATFORM" \
+      -f Dockerfile . \
+      --tag="$IMAGE_NAME:$IMAGE_TAG"; then
+      echo "[ERROR] Docker build failed. Aborting."
+      exit 1
+    fi
+  else
+    echo "[DEBUG] --upload mode: skipping build, using existing $IMAGE_NAME:$IMAGE_TAG"
   fi
 
   local remote_image_tagged="$IMAGE_REPO/$IMAGE_NAME:$IMAGE_TAG"

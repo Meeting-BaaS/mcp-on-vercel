@@ -7,6 +7,7 @@ import {
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp"
 import axios from "axios"
 import z from "zod"
+import { redactArgs, toErrorText } from "../lib/utils"
 
 // Helper to get the v2 client type
 type V2Client = BaasClient<"v2">
@@ -148,20 +149,6 @@ const zoomCredentialShape = {
   extra: z.record(z.unknown()).optional()
 }
 
-/** Strip sensitive fields before logging. Only keeps IDs, names, and status-like keys. */
-function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const sensitiveKeys = new Set([
-    "api_key", "oauth_client_secret", "oauth_refresh_token",
-    "secret", "input_url", "output_url", "meeting_url",
-    "client_secret", "authorization_code"
-  ])
-  const redacted: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(args)) {
-    redacted[key] = sensitiveKeys.has(key) ? "[REDACTED]" : value
-  }
-  return redacted
-}
-
 interface Utterance {
   speaker: string
   text: string
@@ -224,7 +211,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get a list of all bots with their metadata. Use this when you want to: 1) View active bots 2) Check bot status 3) Monitor bot activity",
     V2Zod.listBotsQueryParams.shape,
     async (args) => {
-      console.log("Attempting to list bots", args)
+      console.log("Attempting to list bots", redactArgs(args))
       const result = await baasClient.listBots(args)
       if (!result.success) {
         console.error("Failed to list bots", result.error)
@@ -245,7 +232,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get detailed information about a specific bot including recording data and transcripts. Use this when you want to: 1) Check meeting status 2) Get recording information 3) Access transcription data",
     { bot_id: z.string() },
     async (args) => {
-      console.log("Attempting to get bot details", args)
+      console.log("Attempting to get bot details", redactArgs(args))
       const result = await baasClient.getBotDetails({ bot_id: args.bot_id })
       if (!result.success) {
         console.error("Failed to get bot details", result.error)
@@ -266,7 +253,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get the current status of a bot. Use this when you want to: 1) Check if a bot is still in a meeting 2) Monitor bot connection status 3) Get real-time bot state",
     { bot_id: z.string() },
     async (args) => {
-      console.log("Attempting to get bot status", args)
+      console.log("Attempting to get bot status", redactArgs(args))
       const result = await baasClient.getBotStatus({ bot_id: args.bot_id })
       if (!result.success) {
         console.error("Failed to get bot status", result.error)
@@ -296,7 +283,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
           isError: true
         }
       }
-      console.log("Meeting left successfully", result.data)
+      console.log("Meeting left successfully")
       return {
         content: [{ type: "text" as const, text: `Successfully removed bot ${args.bot_id} from meeting` }]
       }
@@ -312,7 +299,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       delete_from_provider: z.boolean().optional()
     },
     async (args) => {
-      console.log("Attempting to delete bot data", args)
+      console.log("Attempting to delete bot data", redactArgs(args))
       const result = await baasClient.deleteBotData(args)
       if (!result.success) {
         console.error("Failed to delete bot data", result.error)
@@ -358,7 +345,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       cursor: z.string().optional()
     },
     async (args) => {
-      console.log("Attempting to get bot screenshots", args)
+      console.log("Attempting to get bot screenshots", redactArgs(args))
       const result = await baasClient.getBotScreenshots(args)
       if (!result.success) {
         console.error("Failed to get bot screenshots", result.error)
@@ -379,7 +366,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Resend the final webhook for a completed bot. Use this when you want to: 1) Recover from a missed webhook 2) Re-trigger downstream processing 3) Replay the end-of-meeting notification",
     { bot_id: z.string() },
     async (args) => {
-      console.log("Attempting to resend final webhook", args)
+      console.log("Attempting to resend final webhook", redactArgs(args))
       const result = await baasClient.resendFinalWebhook({ bot_id: args.bot_id })
       if (!result.success) {
         console.error("Failed to resend final webhook", result.error)
@@ -548,7 +535,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "List all scheduled bots. Use this when you want to: 1) View upcoming scheduled recordings 2) Check scheduled bot status 3) Monitor planned bot activity",
     V2Zod.listScheduledBotsQueryParams.shape,
     async (args) => {
-      console.log("Attempting to list scheduled bots", args)
+      console.log("Attempting to list scheduled bots", redactArgs(args))
       const result = await baasClient.listScheduledBots(args)
       if (!result.success) {
         console.error("Failed to list scheduled bots", result.error)
@@ -569,7 +556,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get details about a specific scheduled bot. Use this when you want to: 1) Check scheduled bot configuration 2) Verify scheduling details 3) Review bot settings before it joins",
     { bot_id: z.string() },
     async (args) => {
-      console.log("Attempting to get scheduled bot", args)
+      console.log("Attempting to get scheduled bot", redactArgs(args))
       const result = await baasClient.getScheduledBot({ bot_id: args.bot_id })
       if (!result.success) {
         console.error("Failed to get scheduled bot", result.error)
@@ -590,7 +577,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Delete a scheduled bot. Use this when you want to: 1) Cancel a scheduled recording 2) Remove a planned bot 3) Stop a bot from joining a future meeting",
     { bot_id: z.string() },
     async (args) => {
-      console.log("Attempting to delete scheduled bot", args)
+      console.log("Attempting to delete scheduled bot", redactArgs(args))
       const result = await baasClient.deleteScheduledBot({ bot_id: args.bot_id })
       if (!result.success) {
         console.error("Failed to delete scheduled bot", result.error)
@@ -686,7 +673,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "List all calendar connections. Use this when you want to: 1) View configured calendars 2) Check calendar status 3) Manage calendar integrations",
     V2ZodCalendars.listCalendarsQueryParams.shape,
     async (args) => {
-      console.log("Attempting to list calendars", args)
+      console.log("Attempting to list calendars", redactArgs(args))
       const result = await baasClient.listCalendars(args)
       if (!result.success) {
         console.error("Failed to list calendars", result.error)
@@ -707,7 +694,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get details about a specific calendar connection. Use this when you want to: 1) View calendar configuration 2) Check calendar status 3) Verify calendar settings",
     { calendar_id: z.string() },
     async (args) => {
-      console.log("Attempting to get calendar details", args)
+      console.log("Attempting to get calendar details", redactArgs(args))
       const result = await baasClient.getCalendarDetails({ calendar_id: args.calendar_id })
       if (!result.success) {
         console.error("Failed to get calendar details", result.error)
@@ -756,7 +743,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Delete a calendar connection. Use this when you want to: 1) Remove a calendar connection 2) Stop automatic recordings 3) Clean up calendar data",
     { calendar_id: z.string() },
     async (args) => {
-      console.log("Attempting to delete calendar connection", args)
+      console.log("Attempting to delete calendar connection", redactArgs(args))
       const result = await baasClient.deleteCalendarConnection({ calendar_id: args.calendar_id })
       if (!result.success) {
         console.error("Failed to delete calendar connection", result.error)
@@ -777,7 +764,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Synchronize a specific calendar to fetch the latest events. Use this when you want to: 1) Force a calendar sync 2) Update event data 3) Refresh calendar information",
     { calendar_id: z.string() },
     async (args) => {
-      console.log("Attempting to sync calendar", args)
+      console.log("Attempting to sync calendar", redactArgs(args))
       const result = await baasClient.syncCalendar({ calendar_id: args.calendar_id })
       if (!result.success) {
         console.error("Failed to sync calendar", result.error)
@@ -798,7 +785,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Resubscribe a calendar's push notifications. Use this when you want to: 1) Restore event updates after a subscription lapses 2) Recover from missed calendar webhooks 3) Refresh the provider subscription",
     { calendar_id: z.string() },
     async (args) => {
-      console.log("Attempting to resubscribe calendar", args)
+      console.log("Attempting to resubscribe calendar", redactArgs(args))
       const result = await baasClient.resubscribeCalendar({ calendar_id: args.calendar_id })
       if (!result.success) {
         console.error("Failed to resubscribe calendar", result.error)
@@ -856,7 +843,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     },
     async (args) => {
       const { calendar_id, ...query } = args
-      console.log("Attempting to list events", args)
+      console.log("Attempting to list events", redactArgs(args))
       const result = await baasClient.listEvents({ calendar_id, query })
       if (!result.success) {
         console.error("Failed to list events", result.error)
@@ -877,7 +864,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get detailed information about a specific calendar event. Use this when you want to: 1) View event details 2) Check attendees 3) See event configuration",
     { calendar_id: z.string(), event_id: z.string() },
     async (args) => {
-      console.log("Attempting to get event details", args)
+      console.log("Attempting to get event details", redactArgs(args))
       const result = await baasClient.getEventDetails({
         calendar_id: args.calendar_id,
         event_id: args.event_id
@@ -908,7 +895,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     },
     async (args) => {
       const { calendar_id, ...query } = args
-      console.log("Attempting to list event series", args)
+      console.log("Attempting to list event series", redactArgs(args))
       const result = await baasClient.listEventSeries({ calendar_id, query })
       if (!result.success) {
         console.error("Failed to list event series", result.error)
@@ -968,7 +955,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       event_id: z.string()
     },
     async (args) => {
-      console.log("Attempting to delete calendar bot", args)
+      console.log("Attempting to delete calendar bot", redactArgs(args))
       const result = await baasClient.deleteCalendarBot({
         calendar_id: args.calendar_id,
         event_id: args.event_id
@@ -1051,7 +1038,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       extra: z.string().optional()
     },
     async (args) => {
-      console.log("Attempting to list zoom credentials", args)
+      console.log("Attempting to list zoom credentials", redactArgs(args))
       const result = await baasClient.listZoomCredentials(args)
       if (!result.success) {
         console.error("Failed to list zoom credentials", result.error)
@@ -1072,7 +1059,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get details about a specific Zoom credential. Use this when you want to: 1) Inspect a stored Zoom credential 2) Verify its configuration 3) Check the linked Zoom account",
     { id: z.string() },
     async (args) => {
-      console.log("Attempting to get zoom credential", args)
+      console.log("Attempting to get zoom credential", redactArgs(args))
       const result = await baasClient.getZoomCredential({ id: args.id })
       if (!result.success) {
         console.error("Failed to get zoom credential", result.error)
@@ -1123,7 +1110,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Delete a stored Zoom credential. Use this when you want to: 1) Remove an unused Zoom credential 2) Revoke a compromised credential 3) Clean up Zoom integration settings",
     { id: z.string() },
     async (args) => {
-      console.log("Attempting to delete zoom credential", args)
+      console.log("Attempting to delete zoom credential", redactArgs(args))
       const result = await baasClient.deleteZoomCredential({ id: args.id })
       if (!result.success) {
         console.error("Failed to delete zoom credential", result.error)

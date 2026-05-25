@@ -11,6 +11,7 @@ import {
 } from "@meeting-baas/sdk"
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp"
 import z from "zod"
+import { redactArgs, toErrorText } from "../lib/utils"
 
 export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: string): McpServer {
   console.log("Registering v1 tools with baseUrl", baseUrl)
@@ -25,18 +26,28 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using Gladia), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
     joinBody.shape,
     async (args) => {
-      console.log("Attempting to join meeting", args)
-      const { data, success, error } = await baasClient.joinMeeting(args)
-      if (!success) {
-        console.error("Failed to join meeting", error)
+      console.log("Attempting to join meeting", redactArgs(args))
+      try {
+        const { data, success, error } = await baasClient.joinMeeting(args)
+        if (!success) {
+          console.error("Failed to join meeting", toErrorText(error))
+          return {
+            content: [{ type: "text", text: `Failed to join meeting: ${toErrorText(error)}` }],
+            isError: true
+          }
+        }
+        console.log("Joined meeting successfully")
         return {
-          content: [{ type: "text", text: `Failed to join meeting: ${error.message}` }],
+          content: [{ type: "text", text: `Successfully joined meeting, bot_id: ${data.bot_id}` }]
+        }
+      } catch (err) {
+        // The SDK normally returns { success, error }, but network/timeout/parse
+        // failures throw; normalize them into the same MCP isError response.
+        console.error("Error joining meeting", toErrorText(err))
+        return {
+          content: [{ type: "text", text: `Failed to join meeting: ${toErrorText(err)}` }],
           isError: true
         }
-      }
-      console.log("Joined meeting successfully", data)
-      return {
-        content: [{ type: "text", text: `Successfully joined meeting, bot_id: ${data.bot_id}` }]
       }
     }
   )
@@ -64,7 +75,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
         }
       }
 
-      console.log("Meeting left successfully", data)
+      console.log("Meeting left successfully")
       return {
         content: [
           {
@@ -82,7 +93,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get data about a meeting that a bot has joined. Use this when you want to: 1) Check meeting status 2) Get recording information 3) Access transcription data",
     getMeetingDataQueryParams.shape,
     async (args) => {
-      console.log("Attempting to get meeting data", args)
+      console.log("Attempting to get meeting data", redactArgs(args))
       const { data, success, error } = await baasClient.getMeetingData(args)
 
       if (!success) {
@@ -116,7 +127,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     { bot_id: z.string() },
     async (args) => {
       const { bot_id } = args
-      console.log("Attempting to delete meeting data", args)
+      console.log("Attempting to delete meeting data", redactArgs(args))
       const { success, error } = await baasClient.deleteBotData({ uuid: bot_id })
 
       if (!success) {
@@ -149,7 +160,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Transcribe or retranscribe a bot recording using the Default or provided Speech to Text Provider. Use this when you want to: 1) Transcribe a bot recording 2) Retranscribe if you want to improve the transcription",
     retranscribeBotBody.shape,
     async (args) => {
-      console.log("Attempting to retranscribe bot", args)
+      console.log("Attempting to retranscribe bot", redactArgs(args))
       const { data, success, error } = await baasClient.retranscribeBot(args)
 
       if (!success) {
@@ -182,7 +193,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Create a new calendar integration. Use this when you want to: 1) Set up automatic meeting recordings 2) Configure calendar-based bot scheduling 3) Enable recurring meeting coverage",
     createCalendarBody.shape,
     async (args) => {
-      console.log("Attempting to create calendar", args)
+      console.log("Attempting to create calendar", redactArgs(args))
       const { data, success, error } = await baasClient.createCalendar(args)
 
       if (!success) {
@@ -249,7 +260,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     { calendar_id: z.string() },
     async (args) => {
       const { calendar_id } = args
-      console.log("Attempting to get calendar", args)
+      console.log("Attempting to get calendar", redactArgs(args))
       const { data, success, error } = await baasClient.getCalendar({ uuid: calendar_id })
 
       if (!success) {
@@ -283,7 +294,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     { calendar_id: z.string() },
     async (args) => {
       const { calendar_id } = args
-      console.log("Attempting to delete calendar", args)
+      console.log("Attempting to delete calendar", redactArgs(args))
       const { success, error } = await baasClient.deleteCalendar({ uuid: calendar_id })
 
       if (!success) {
@@ -316,7 +327,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     "Get a list of all bots with their metadata. Use this when you want to: 1) View active bots 2) Check bot status 3) Monitor bot activity",
     botsWithMetadataQueryParams.shape,
     async (args) => {
-      console.log("Attempting to get bots with metadata", args)
+      console.log("Attempting to get bots with metadata", redactArgs(args))
       const { data, success, error } = await baasClient.listBots(args)
 
       if (!success) {
@@ -349,7 +360,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     "List all scheduled events. Use this when you want to: 1) View upcoming recordings 2) Check scheduled transcriptions 3) Monitor planned bot activity",
     listEventsQueryParams.shape,
     async (args) => {
-      console.log("Attempting to list events", args)
+      console.log("Attempting to list events", redactArgs(args))
       const { data, success, error } = await baasClient.listCalendarEvents(args)
 
       if (!success) {
@@ -387,7 +398,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     },
     async (args) => {
       const { calendar_id, all_occurrences, ...body } = args
-      console.log("Attempting to schedule event recording", args)
+      console.log("Attempting to schedule event recording", redactArgs(args))
 
       const params = {
         uuid: calendar_id,
@@ -431,7 +442,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     },
     async (args) => {
       const { event_uuid, all_occurrences } = args
-      console.log("Attempting to unschedule event recording", args)
+      console.log("Attempting to unschedule event recording", redactArgs(args))
       const { data, success, error } = await baasClient.unscheduleCalendarRecordEvent({
         uuid: event_uuid,
         query: { all_occurrences: all_occurrences || false }
@@ -471,7 +482,7 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
     },
     async (args) => {
       const { calendar_id, ...body } = args
-      console.log("Attempting to update calendar", args)
+      console.log("Attempting to update calendar", redactArgs(args))
       const { data, success, error } = await baasClient.updateCalendar({
         uuid: calendar_id,
         body
