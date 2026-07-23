@@ -5,6 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { IncomingMessage, ServerResponse } from "http"
 import type z from "zod"
 import { MCP_URL } from "./constants"
+import { buildWwwAuthenticate, handleOAuthRoute, isOAuthAccessToken, resolveAccessToken } from "./oauth"
 import { getApiUrl } from "./utils"
 
 interface ServerOptions extends McpServerOptions {
@@ -45,6 +46,11 @@ export function initializeMcpApiHandler(
   return async function mcpApiHandler(req: IncomingMessage, res: ServerResponse) {
     const url = new URL(req.url || "", MCP_URL)
 
+    // OAuth authorization server + metadata endpoints (marketplace clients)
+    if (await handleOAuthRoute(req, res, url)) {
+      return
+    }
+
     if (url.pathname !== "/mcp") {
       res.statusCode = 404
       res.end("Not found")
@@ -83,14 +89,65 @@ export function initializeMcpApiHandler(
     }
     console.log("API version:", apiVersion)
 
-    // Extract API key from headers
-    apiKey =
-      (req.headers["x-meeting-baas-api-key"] as string) ||
-      (req.headers["x-meetingbaas-apikey"] as string) ||
-      (req.headers["x-api-key"] as string) ||
-      (req.headers["authorization"] as string)?.replace(/bearer\s+/i, "") ||
-      (process.env.NODE_ENV === "development" ? process.env.BAAS_API_KEY : null) ||
-      null
+    // Extract credentials: an OAuth access token (marketplace clients) or a raw
+    // API key in legacy headers. Opaque mbt_* tokens resolve to the user's
+    // Meeting BaaS API key via Redis; any other Authorization value is treated
+    // as a raw API key for backward compatibility.
+    const bearer = (req.headers["authorization"] as string)?.replace(/^bearer\s+/i, "") || null
+    if (bearer && isOAuthAccessToken(bearer)) {
+      const record = await resolveAccessToken(bearer)
+      if (!record) {
+        res
+          .writeHead(401, {
+            "Content-Type": "application/json",
+            "WWW-Authenticate": buildWwwAuthenticate("invalid_token")
+          })
+          .end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: { code: -32000, message: "Invalid or expired access token." },
+              id: null
+            })
+          )
+        return
+      }
+      apiKey = record.api_key
+      // OAuth clients come from the marketplaces and should always get the v2
+      // tools unless they explicitly pin a version.
+      if (versionValue === undefined) {
+        apiVersion = "v2"
+      }
+    } else {
+      apiKey =
+        (req.headers["x-meeting-baas-api-key"] as string) ||
+        (req.headers["x-meetingbaas-apikey"] as string) ||
+        (req.headers["x-api-key"] as string) ||
+        bearer ||
+        (process.env.NODE_ENV === "development" ? process.env.BAAS_API_KEY : null) ||
+        null
+    }
+
+    // No credentials at all: challenge with the resource metadata URL so OAuth
+    // clients can discover the authorization server (RFC 9728).
+    if (!apiKey && req.method === "POST") {
+      res
+        .writeHead(401, {
+          "Content-Type": "application/json",
+          "WWW-Authenticate": buildWwwAuthenticate()
+        })
+        .end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32000,
+              message:
+                "Authentication required. Provide a Meeting BaaS API key header or complete the OAuth flow."
+            },
+            id: null
+          })
+        )
+      return
+    }
 
     // Route to existing session or create a new one
     const sessionId = req.headers["mcp-session-id"] as string | undefined
@@ -115,8 +172,8 @@ export function initializeMcpApiHandler(
 
       const server = new McpServer(
         {
-          name: "mcp-typescript server on vercel",
-          version: "0.1.0"
+          name: "Meeting BaaS",
+          version: "1.0.0"
         },
         serverOptions
       )

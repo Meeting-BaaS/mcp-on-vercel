@@ -21,10 +21,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   })
 
   // For Join Meeting
-  server.tool(
+  server.registerTool(
     "joinMeeting",
-    "Send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using Gladia), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
-    joinBody.shape,
+    {
+      title: "Join Meeting",
+      description:
+        "Send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using Gladia), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
+      inputSchema: joinBody.shape,
+      annotations: { openWorldHint: true, destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to join meeting", redactArgs(args))
       try {
@@ -53,10 +58,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Leave Meeting
-  server.tool(
+  server.registerTool(
     "leaveMeeting",
-    "Remove an AI bot from a meeting. Use this when you want to: 1) End a meeting recording 2) Stop transcription 3) Disconnect the bot from the meeting",
-    { bot_id: z.string() },
+    {
+      title: "Leave Meeting",
+      description:
+        "Remove an AI bot from a meeting. Use this when you want to: 1) End a meeting recording 2) Stop transcription 3) Disconnect the bot from the meeting",
+      inputSchema: { bot_id: z.string() },
+      annotations: { destructiveHint: true, idempotentHint: true }
+    },
     async (args) => {
       const { bot_id } = args
       console.log(`Attempting to remove bot ${bot_id} from meeting`)
@@ -88,10 +98,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Get Meeting Data
-  server.tool(
+  server.registerTool(
     "getMeetingData",
-    "Get data about a meeting that a bot has joined. Use this when you want to: 1) Check meeting status 2) Get recording information 3) Access transcription data",
-    getMeetingDataQueryParams.shape,
+    {
+      title: "Get Meeting Data",
+      description:
+        "Get data about a meeting that a bot has joined. Use this when you want to: 1) Check meeting status 2) Get recording information 3) Access transcription data",
+      inputSchema: getMeetingDataQueryParams.shape,
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to get meeting data", redactArgs(args))
       const { data, success, error } = await baasClient.getMeetingData(args)
@@ -121,10 +136,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Delete Data
-  server.tool(
+  server.registerTool(
     "deleteData",
-    "Delete data associated with a meeting bot. Use this when you want to: 1) Remove meeting recordings 2) Delete transcription data 3) Clean up bot data",
-    { bot_id: z.string() },
+    {
+      title: "Delete Bot Data",
+      description:
+        "Delete data associated with a meeting bot. Use this when you want to: 1) Remove meeting recordings 2) Delete transcription data 3) Clean up bot data",
+      inputSchema: { bot_id: z.string() },
+      annotations: { destructiveHint: true, idempotentHint: true }
+    },
     async (args) => {
       const { bot_id } = args
       console.log("Attempting to delete meeting data", redactArgs(args))
@@ -155,10 +175,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Re-Transcribe Bot
-  server.tool(
+  server.registerTool(
     "retranscribeBot",
-    "Transcribe or retranscribe a bot recording using the Default or provided Speech to Text Provider. Use this when you want to: 1) Transcribe a bot recording 2) Retranscribe if you want to improve the transcription",
-    retranscribeBotBody.shape,
+    {
+      title: "Retranscribe Bot",
+      description:
+        "Transcribe or retranscribe a bot recording using the Default or provided Speech to Text Provider. Use this when you want to: 1) Transcribe a bot recording 2) Retranscribe if you want to improve the transcription",
+      inputSchema: retranscribeBotBody.shape,
+      annotations: { destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to retranscribe bot", redactArgs(args))
       const { data, success, error } = await baasClient.retranscribeBot(args)
@@ -188,10 +213,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Create Calendar
-  server.tool(
+  server.registerTool(
     "createCalendar",
-    "Create a new calendar integration. Use this when you want to: 1) Set up automatic meeting recordings 2) Configure calendar-based bot scheduling 3) Enable recurring meeting coverage",
-    createCalendarBody.shape,
+    {
+      title: "Create Calendar",
+      description:
+        "Create a new calendar integration. Use this when you want to: 1) Set up automatic meeting recordings 2) Configure calendar-based bot scheduling 3) Enable recurring meeting coverage",
+      inputSchema: createCalendarBody.shape,
+      annotations: { destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to create calendar", redactArgs(args))
       const { data, success, error } = await baasClient.createCalendar(args)
@@ -221,10 +251,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For List Calendar
-  server.tool(
+  server.registerTool(
     "listCalendars",
-    "List all calendar integrations. Use this when you want to: 1) View configured calendars 2) Check calendar status 3) Manage calendar integrations",
-    {},
+    {
+      title: "List Calendars",
+      description:
+        "List all calendar integrations. Use this when you want to: 1) View configured calendars 2) Check calendar status 3) Manage calendar integrations",
+      inputSchema: {},
+      annotations: { readOnlyHint: true }
+    },
     async () => {
       console.log("Attempting to list calendars")
       const { data, success, error } = await baasClient.listCalendars()
@@ -254,10 +289,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Get Calendar
-  server.tool(
+  server.registerTool(
     "getCalendar",
-    "Get details about a specific calendar integration. Use this when you want to: 1) View calendar configuration 2) Check calendar status 3) Verify calendar settings",
-    { calendar_id: z.string() },
+    {
+      title: "Get Calendar",
+      description:
+        "Get details about a specific calendar integration. Use this when you want to: 1) View calendar configuration 2) Check calendar status 3) Verify calendar settings",
+      inputSchema: { calendar_id: z.string() },
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       const { calendar_id } = args
       console.log("Attempting to get calendar", redactArgs(args))
@@ -288,10 +328,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For delete Calendar
-  server.tool(
+  server.registerTool(
     "deleteCalendar",
-    "Delete a calendar integration. Use this when you want to: 1) Remove a calendar connection 2) Stop automatic recordings 3) Clean up calendar data",
-    { calendar_id: z.string() },
+    {
+      title: "Delete Calendar",
+      description:
+        "Delete a calendar integration. Use this when you want to: 1) Remove a calendar connection 2) Stop automatic recordings 3) Clean up calendar data",
+      inputSchema: { calendar_id: z.string() },
+      annotations: { destructiveHint: true, idempotentHint: true }
+    },
     async (args) => {
       const { calendar_id } = args
       console.log("Attempting to delete calendar", redactArgs(args))
@@ -322,10 +367,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Bots with meta data
-  server.tool(
+  server.registerTool(
     "botsWithMetadata",
-    "Get a list of all bots with their metadata. Use this when you want to: 1) View active bots 2) Check bot status 3) Monitor bot activity",
-    botsWithMetadataQueryParams.shape,
+    {
+      title: "List Bots With Metadata",
+      description:
+        "Get a list of all bots with their metadata. Use this when you want to: 1) View active bots 2) Check bot status 3) Monitor bot activity",
+      inputSchema: botsWithMetadataQueryParams.shape,
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to get bots with metadata", redactArgs(args))
       const { data, success, error } = await baasClient.listBots(args)
@@ -355,10 +405,15 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For List All Events
-  server.tool(
+  server.registerTool(
     "listEvents",
-    "List all scheduled events. Use this when you want to: 1) View upcoming recordings 2) Check scheduled transcriptions 3) Monitor planned bot activity",
-    listEventsQueryParams.shape,
+    {
+      title: "List Events",
+      description:
+        "List all scheduled events. Use this when you want to: 1) View upcoming recordings 2) Check scheduled transcriptions 3) Monitor planned bot activity",
+      inputSchema: listEventsQueryParams.shape,
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to list events", redactArgs(args))
       const { data, success, error } = await baasClient.listCalendarEvents(args)
@@ -388,13 +443,18 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Schedule Record Events
-  server.tool(
+  server.registerTool(
     "scheduleRecordEvent",
-    "Schedule a recording. Use this when you want to: 1) Set up automatic recording 2) Schedule future transcriptions 3) Plan meeting recordings",
     {
-      calendar_id: z.string(),
-      all_occurrences: z.boolean().optional(),
-      ...scheduleRecordEventBody.shape
+      title: "Schedule Record Event",
+      description:
+        "Schedule a recording. Use this when you want to: 1) Set up automatic recording 2) Schedule future transcriptions 3) Plan meeting recordings",
+      inputSchema: {
+        calendar_id: z.string(),
+        all_occurrences: z.boolean().optional(),
+        ...scheduleRecordEventBody.shape
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       const { calendar_id, all_occurrences, ...body } = args
@@ -433,12 +493,17 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Un-Schedule Record Events
-  server.tool(
+  server.registerTool(
     "unscheduleRecordEvent",
-    "Cancel a scheduled recording. Use this when you want to: 1) Cancel automatic recording 2) Stop planned transcription 3) Remove scheduled bot activity",
     {
-      event_uuid: z.string(),
-      all_occurrences: z.boolean().optional()
+      title: "Unschedule Record Event",
+      description:
+        "Cancel a scheduled recording. Use this when you want to: 1) Cancel automatic recording 2) Stop planned transcription 3) Remove scheduled bot activity",
+      inputSchema: {
+        event_uuid: z.string(),
+        all_occurrences: z.boolean().optional()
+      },
+      annotations: { destructiveHint: true, idempotentHint: true }
     },
     async (args) => {
       const { event_uuid, all_occurrences } = args
@@ -473,12 +538,17 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // For Update Calendar
-  server.tool(
+  server.registerTool(
     "updateCalendar",
-    "Update a calendar integration configuration. Use this when you want to: 1) Modify calendar settings 2) Update connection details 3) Change calendar configuration",
     {
-      calendar_id: z.string(),
-      ...updateCalendarBody.shape
+      title: "Update Calendar",
+      description:
+        "Update a calendar integration configuration. Use this when you want to: 1) Modify calendar settings 2) Update connection details 3) Change calendar configuration",
+      inputSchema: {
+        calendar_id: z.string(),
+        ...updateCalendarBody.shape
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       const { calendar_id, ...body } = args
@@ -511,16 +581,6 @@ export function registerV1Tools(server: McpServer, apiKey: string, baseUrl?: str
       }
     }
   )
-
-  // Add echo tool for testing
-  server.tool("echo", { message: z.string() }, async ({ message }: { message: string }) => ({
-    content: [
-      {
-        type: "text",
-        text: `Tool echo: ${message}`
-      }
-    ]
-  }))
 
   return server
 }

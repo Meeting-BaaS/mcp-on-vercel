@@ -184,10 +184,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // --- Bot Management ---
 
   // Create Bot (equivalent to v1 joinMeeting)
-  server.tool(
+  server.registerTool(
     "createBot",
-    "Create and send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using the Gladia provider), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
-    botConfigShape,
+    {
+      title: "Create Bot",
+      description: "Create and send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using the Gladia provider), and provide real-time audio streams. Use this when you want to: 1) Record a meeting 2) Get meeting transcriptions 3) Stream meeting audio 4) Monitor meeting attendance",
+      inputSchema: botConfigShape,
+      annotations: { openWorldHint: true, destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to create bot", redactArgs(args))
       const result = await baasClient.createBot(withTranscriptionDefaults(args))
@@ -206,10 +210,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // List Bots (equivalent to v1 botsWithMetadata)
-  server.tool(
+  server.registerTool(
     "listBots",
-    "Get a list of all bots with their metadata. Use this when you want to: 1) View active bots 2) Check bot status 3) Monitor bot activity",
-    V2Zod.listBotsQueryParams.shape,
+    {
+      title: "List Bots",
+      description: "Get a list of all bots with their metadata. Use this when you want to: 1) View active bots 2) Check bot status 3) Monitor bot activity",
+      inputSchema: V2Zod.listBotsQueryParams.shape,
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to list bots", redactArgs(args))
       const result = await baasClient.listBots(args)
@@ -227,10 +235,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Get Bot Details (equivalent to v1 getMeetingData)
-  server.tool(
+  server.registerTool(
     "getBotDetails",
-    "Get detailed information about a specific bot including recording data and transcripts. Use this when you want to: 1) Check meeting status 2) Get recording information 3) Access transcription data",
-    { bot_id: z.string() },
+    {
+      title: "Get Bot Details",
+      description: "Get detailed information about a specific bot including recording data and transcripts. Use this when you want to: 1) Check meeting status 2) Get recording information 3) Access transcription data",
+      inputSchema: { bot_id: z.string() },
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to get bot details", redactArgs(args))
       const result = await baasClient.getBotDetails({ bot_id: args.bot_id })
@@ -248,10 +260,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Get Bot Status
-  server.tool(
+  server.registerTool(
     "getBotStatus",
-    "Get the current status of a bot. Use this when you want to: 1) Check if a bot is still in a meeting 2) Monitor bot connection status 3) Get real-time bot state",
-    { bot_id: z.string() },
+    {
+      title: "Get Bot Status",
+      description: "Get the current status of a bot. Use this when you want to: 1) Check if a bot is still in a meeting 2) Monitor bot connection status 3) Get real-time bot state",
+      inputSchema: { bot_id: z.string() },
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to get bot status", redactArgs(args))
       const result = await baasClient.getBotStatus({ bot_id: args.bot_id })
@@ -269,10 +285,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Leave Bot (equivalent to v1 leaveMeeting)
-  server.tool(
+  server.registerTool(
     "leaveBot",
-    "Remove an AI bot from a meeting. Use this when you want to: 1) End a meeting recording 2) Stop transcription 3) Disconnect the bot from the meeting",
-    { bot_id: z.string() },
+    {
+      title: "Leave Bot",
+      description: "Remove an AI bot from a meeting. Use this when you want to: 1) End a meeting recording 2) Stop transcription 3) Disconnect the bot from the meeting",
+      inputSchema: { bot_id: z.string() },
+      annotations: { destructiveHint: true, idempotentHint: true }
+    },
     async (args) => {
       console.log(`Attempting to remove bot ${args.bot_id} from meeting`)
       const result = await baasClient.leaveBot({ bot_id: args.bot_id })
@@ -291,12 +311,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Delete Bot Data (equivalent to v1 deleteData)
-  server.tool(
+  server.registerTool(
     "deleteBotData",
-    "Delete data associated with a meeting bot. Use this when you want to: 1) Remove meeting recordings 2) Delete transcription data 3) Clean up bot data",
     {
-      bot_id: z.string(),
-      delete_from_provider: z.boolean().optional()
+      title: "Delete Bot Data",
+      description: "Delete data associated with a meeting bot. Use this when you want to: 1) Remove meeting recordings 2) Delete transcription data 3) Clean up bot data",
+      inputSchema: {
+        bot_id: z.string(),
+        delete_from_provider: z.boolean().optional()
+      },
+      annotations: { destructiveHint: true, idempotentHint: true }
     },
     async (args) => {
       console.log("Attempting to delete bot data", redactArgs(args))
@@ -315,10 +339,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Batch Create Bots
-  server.tool(
+  server.registerTool(
     "batchCreateBots",
-    "Create multiple bots in a single request. Use this when you want to: 1) Send bots to several meetings at once 2) Bulk-record a set of meetings 3) Reduce round-trips when scheduling many bots",
-    { bots: z.array(z.object(botConfigShape)).min(1).describe("Array of bot configurations to create") },
+    {
+      title: "Batch Create Bots",
+      description: "Create multiple bots in a single request. Use this when you want to: 1) Send bots to several meetings at once 2) Bulk-record a set of meetings 3) Reduce round-trips when scheduling many bots",
+      inputSchema: { bots: z.array(z.object(botConfigShape)).min(1).describe("Array of bot configurations to create") },
+      annotations: { openWorldHint: true, destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to batch create bots", { count: args.bots.length })
       const result = await baasClient.batchCreateBots(args.bots.map(withTranscriptionDefaults))
@@ -336,13 +364,17 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Get Bot Screenshots
-  server.tool(
+  server.registerTool(
     "getBotScreenshots",
-    "Get screenshots captured during a bot session. Use this when you want to: 1) Verify what the bot saw in the meeting 2) Inspect the meeting visually 3) Debug a recording",
     {
-      bot_id: z.string(),
-      limit: z.number().optional(),
-      cursor: z.string().optional()
+      title: "Get Bot Screenshots",
+      description: "Get screenshots captured during a bot session. Use this when you want to: 1) Verify what the bot saw in the meeting 2) Inspect the meeting visually 3) Debug a recording",
+      inputSchema: {
+        bot_id: z.string(),
+        limit: z.number().optional(),
+        cursor: z.string().optional()
+      },
+      annotations: { readOnlyHint: true }
     },
     async (args) => {
       console.log("Attempting to get bot screenshots", redactArgs(args))
@@ -361,10 +393,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Resend Final Webhook
-  server.tool(
+  server.registerTool(
     "resendFinalWebhook",
-    "Resend the final webhook for a completed bot. Use this when you want to: 1) Recover from a missed webhook 2) Re-trigger downstream processing 3) Replay the end-of-meeting notification",
-    { bot_id: z.string() },
+    {
+      title: "Resend Final Webhook",
+      description: "Resend the final webhook for a completed bot. Use this when you want to: 1) Recover from a missed webhook 2) Re-trigger downstream processing 3) Replay the end-of-meeting notification",
+      inputSchema: { bot_id: z.string() },
+      annotations: { destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to resend final webhook", redactArgs(args))
       const result = await baasClient.resendFinalWebhook({ bot_id: args.bot_id })
@@ -382,12 +418,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Retry Callback
-  server.tool(
+  server.registerTool(
     "retryCallback",
-    "Retry the callback for a bot, optionally overriding the callback configuration. Use this when you want to: 1) Re-deliver a failed callback 2) Point a callback at a new URL 3) Recover from a callback outage",
     {
-      bot_id: z.string(),
-      callback_config: callbackConfigSchema
+      title: "Retry Callback",
+      description: "Retry the callback for a bot, optionally overriding the callback configuration. Use this when you want to: 1) Re-deliver a failed callback 2) Point a callback at a new URL 3) Recover from a callback outage",
+      inputSchema: {
+        bot_id: z.string(),
+        callback_config: callbackConfigSchema
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       console.log("Attempting to retry callback", redactArgs(args))
@@ -406,12 +446,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Update Bot Config
-  server.tool(
+  server.registerTool(
     "updateBotConfig",
-    "Update a running bot's extra metadata (shallow-merged with existing data). Use this when you want to: 1) Attach metadata to a live bot 2) Tag a recording in progress 3) Correlate a bot with external records",
     {
-      bot_id: z.string(),
-      extra: z.record(z.unknown()).describe("Custom metadata to merge with the bot's existing extra data")
+      title: "Update Bot Config",
+      description: "Update a running bot's extra metadata (shallow-merged with existing data). Use this when you want to: 1) Attach metadata to a live bot 2) Tag a recording in progress 3) Correlate a bot with external records",
+      inputSchema: {
+        bot_id: z.string(),
+        extra: z.record(z.unknown()).describe("Custom metadata to merge with the bot's existing extra data")
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       console.log("Attempting to update bot config", { bot_id: args.bot_id })
@@ -430,12 +474,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Send Chat Message
-  server.tool(
+  server.registerTool(
     "sendChatMessage",
-    "Send a chat message into the meeting via the bot. Use this when you want to: 1) Post a message to participants 2) Share a link or instruction 3) Acknowledge something in the meeting chat",
     {
-      bot_id: z.string(),
-      message: chatMessageSchema.describe("The chat message text to send in the meeting (1-500 chars)")
+      title: "Send Chat Message",
+      description: "Send a chat message into the meeting via the bot. Use this when you want to: 1) Post a message to participants 2) Share a link or instruction 3) Acknowledge something in the meeting chat",
+      inputSchema: {
+        bot_id: z.string(),
+        message: chatMessageSchema.describe("The chat message text to send in the meeting (1-500 chars)")
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       console.log("Attempting to send chat message", { bot_id: args.bot_id })
@@ -454,12 +502,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Pause Bot Recording
-  server.tool(
+  server.registerTool(
     "pauseBotRecording",
-    "Pause an in-progress recording for a live bot, optionally posting a chat message to participants. Use this when you want to: 1) Temporarily stop recording sensitive discussion 2) Pause during a break 3) Control recording without removing the bot",
     {
-      bot_id: z.string(),
-      chat_message: chatMessageSchema.optional().describe("Optional message to post to participants when pausing")
+      title: "Pause Bot Recording",
+      description: "Pause an in-progress recording for a live bot, optionally posting a chat message to participants. Use this when you want to: 1) Temporarily stop recording sensitive discussion 2) Pause during a break 3) Control recording without removing the bot",
+      inputSchema: {
+        bot_id: z.string(),
+        chat_message: chatMessageSchema.optional().describe("Optional message to post to participants when pausing")
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       console.log("Attempting to pause bot recording", { bot_id: args.bot_id })
@@ -479,12 +531,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Resume Bot Recording
-  server.tool(
+  server.registerTool(
     "resumeBotRecording",
-    "Resume a paused recording for a live bot, optionally posting a chat message to participants. Use this when you want to: 1) Continue recording after a pause 2) Resume after a break 3) Re-enable capture without re-joining",
     {
-      bot_id: z.string(),
-      chat_message: chatMessageSchema.optional().describe("Optional message to post to participants when resuming")
+      title: "Resume Bot Recording",
+      description: "Resume a paused recording for a live bot, optionally posting a chat message to participants. Use this when you want to: 1) Continue recording after a pause 2) Resume after a break 3) Re-enable capture without re-joining",
+      inputSchema: {
+        bot_id: z.string(),
+        chat_message: chatMessageSchema.optional().describe("Optional message to post to participants when resuming")
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       console.log("Attempting to resume bot recording", { bot_id: args.bot_id })
@@ -506,12 +562,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // --- Scheduled Bots ---
 
   // Create Scheduled Bot
-  server.tool(
+  server.registerTool(
     "createScheduledBot",
-    "Schedule a bot to join a meeting at a future time. Use this when you want to: 1) Pre-schedule meeting recordings 2) Set up bots for upcoming meetings 3) Automate meeting attendance",
     {
-      ...botConfigShape,
-      join_at: z.string().describe("ISO8601 timestamp for when the bot should join the meeting")
+      title: "Create Scheduled Bot",
+      description: "Schedule a bot to join a meeting at a future time. Use this when you want to: 1) Pre-schedule meeting recordings 2) Set up bots for upcoming meetings 3) Automate meeting attendance",
+      inputSchema: {
+        ...botConfigShape,
+        join_at: z.string().describe("ISO8601 timestamp for when the bot should join the meeting")
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       console.log("Attempting to create scheduled bot", redactArgs(args))
@@ -530,10 +590,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // List Scheduled Bots
-  server.tool(
+  server.registerTool(
     "listScheduledBots",
-    "List all scheduled bots. Use this when you want to: 1) View upcoming scheduled recordings 2) Check scheduled bot status 3) Monitor planned bot activity",
-    V2Zod.listScheduledBotsQueryParams.shape,
+    {
+      title: "List Scheduled Bots",
+      description: "List all scheduled bots. Use this when you want to: 1) View upcoming scheduled recordings 2) Check scheduled bot status 3) Monitor planned bot activity",
+      inputSchema: V2Zod.listScheduledBotsQueryParams.shape,
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to list scheduled bots", redactArgs(args))
       const result = await baasClient.listScheduledBots(args)
@@ -551,10 +615,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Get Scheduled Bot
-  server.tool(
+  server.registerTool(
     "getScheduledBot",
-    "Get details about a specific scheduled bot. Use this when you want to: 1) Check scheduled bot configuration 2) Verify scheduling details 3) Review bot settings before it joins",
-    { bot_id: z.string() },
+    {
+      title: "Get Scheduled Bot",
+      description: "Get details about a specific scheduled bot. Use this when you want to: 1) Check scheduled bot configuration 2) Verify scheduling details 3) Review bot settings before it joins",
+      inputSchema: { bot_id: z.string() },
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to get scheduled bot", redactArgs(args))
       const result = await baasClient.getScheduledBot({ bot_id: args.bot_id })
@@ -572,10 +640,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Delete Scheduled Bot
-  server.tool(
+  server.registerTool(
     "deleteScheduledBot",
-    "Delete a scheduled bot. Use this when you want to: 1) Cancel a scheduled recording 2) Remove a planned bot 3) Stop a bot from joining a future meeting",
-    { bot_id: z.string() },
+    {
+      title: "Delete Scheduled Bot",
+      description: "Delete a scheduled bot. Use this when you want to: 1) Cancel a scheduled recording 2) Remove a planned bot 3) Stop a bot from joining a future meeting",
+      inputSchema: { bot_id: z.string() },
+      annotations: { destructiveHint: true, idempotentHint: true }
+    },
     async (args) => {
       console.log("Attempting to delete scheduled bot", redactArgs(args))
       const result = await baasClient.deleteScheduledBot({ bot_id: args.bot_id })
@@ -593,14 +665,18 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Batch Create Scheduled Bots
-  server.tool(
+  server.registerTool(
     "batchCreateScheduledBots",
-    "Schedule multiple bots in a single request. Use this when you want to: 1) Pre-schedule recordings for many meetings at once 2) Bulk-automate future attendance 3) Reduce round-trips when scheduling",
     {
-      bots: z.array(z.object({
-        ...botConfigShape,
-        join_at: z.string().describe("ISO8601 timestamp for when the bot should join the meeting")
-      })).min(1).describe("Array of scheduled bot configurations")
+      title: "Batch Create Scheduled Bots",
+      description: "Schedule multiple bots in a single request. Use this when you want to: 1) Pre-schedule recordings for many meetings at once 2) Bulk-automate future attendance 3) Reduce round-trips when scheduling",
+      inputSchema: {
+        bots: z.array(z.object({
+          ...botConfigShape,
+          join_at: z.string().describe("ISO8601 timestamp for when the bot should join the meeting")
+        })).min(1).describe("Array of scheduled bot configurations")
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       console.log("Attempting to batch create scheduled bots", { count: args.bots.length })
@@ -619,13 +695,17 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Update Scheduled Bot
-  server.tool(
+  server.registerTool(
     "updateScheduledBot",
-    "Update the configuration of a scheduled bot before it joins. Use this when you want to: 1) Change a scheduled bot's settings 2) Update the meeting URL 3) Adjust recording or timeout options",
     {
-      bot_id: z.string(),
-      ...botUpdateShape,
-      join_at: z.string().optional().describe("ISO8601 timestamp for when the bot should join the meeting")
+      title: "Update Scheduled Bot",
+      description: "Update the configuration of a scheduled bot before it joins. Use this when you want to: 1) Change a scheduled bot's settings 2) Update the meeting URL 3) Adjust recording or timeout options",
+      inputSchema: {
+        bot_id: z.string(),
+        ...botUpdateShape,
+        join_at: z.string().optional().describe("ISO8601 timestamp for when the bot should join the meeting")
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       const { bot_id, ...body } = args
@@ -647,10 +727,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // --- Calendar Connections ---
 
   // Create Calendar Connection (equivalent to v1 createCalendar)
-  server.tool(
+  server.registerTool(
     "createCalendarConnection",
-    "Create a new calendar connection. Use this when you want to: 1) Set up automatic meeting recordings 2) Configure calendar-based bot scheduling 3) Enable recurring meeting coverage",
-    V2ZodCalendars.createCalendarConnectionBody.shape,
+    {
+      title: "Create Calendar Connection",
+      description: "Create a new calendar connection. Use this when you want to: 1) Set up automatic meeting recordings 2) Configure calendar-based bot scheduling 3) Enable recurring meeting coverage",
+      inputSchema: V2ZodCalendars.createCalendarConnectionBody.shape,
+      annotations: { destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to create calendar connection", redactArgs(args))
       const result = await baasClient.createCalendarConnection(args)
@@ -668,10 +752,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // List Calendars
-  server.tool(
+  server.registerTool(
     "listCalendars",
-    "List all calendar connections. Use this when you want to: 1) View configured calendars 2) Check calendar status 3) Manage calendar integrations",
-    V2ZodCalendars.listCalendarsQueryParams.shape,
+    {
+      title: "List Calendars",
+      description: "List all calendar connections. Use this when you want to: 1) View configured calendars 2) Check calendar status 3) Manage calendar integrations",
+      inputSchema: V2ZodCalendars.listCalendarsQueryParams.shape,
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to list calendars", redactArgs(args))
       const result = await baasClient.listCalendars(args)
@@ -689,10 +777,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Get Calendar Details (equivalent to v1 getCalendar)
-  server.tool(
+  server.registerTool(
     "getCalendarDetails",
-    "Get details about a specific calendar connection. Use this when you want to: 1) View calendar configuration 2) Check calendar status 3) Verify calendar settings",
-    { calendar_id: z.string() },
+    {
+      title: "Get Calendar Details",
+      description: "Get details about a specific calendar connection. Use this when you want to: 1) View calendar configuration 2) Check calendar status 3) Verify calendar settings",
+      inputSchema: { calendar_id: z.string() },
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to get calendar details", redactArgs(args))
       const result = await baasClient.getCalendarDetails({ calendar_id: args.calendar_id })
@@ -710,15 +802,19 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Update Calendar Connection (equivalent to v1 updateCalendar)
-  server.tool(
+  server.registerTool(
     "updateCalendarConnection",
-    "Update a calendar connection configuration. Use this when you want to: 1) Modify calendar settings 2) Update OAuth credentials 3) Change calendar configuration",
     {
-      calendar_id: z.string(),
-      oauth_client_id: z.string(),
-      oauth_client_secret: z.string(),
-      oauth_refresh_token: z.string(),
-      oauth_tenant_id: z.string().optional()
+      title: "Update Calendar Connection",
+      description: "Update a calendar connection configuration. Use this when you want to: 1) Modify calendar settings 2) Update OAuth credentials 3) Change calendar configuration",
+      inputSchema: {
+        calendar_id: z.string(),
+        oauth_client_id: z.string(),
+        oauth_client_secret: z.string(),
+        oauth_refresh_token: z.string(),
+        oauth_tenant_id: z.string().optional()
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       const { calendar_id, ...body } = args
@@ -738,10 +834,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Delete Calendar Connection (equivalent to v1 deleteCalendar)
-  server.tool(
+  server.registerTool(
     "deleteCalendarConnection",
-    "Delete a calendar connection. Use this when you want to: 1) Remove a calendar connection 2) Stop automatic recordings 3) Clean up calendar data",
-    { calendar_id: z.string() },
+    {
+      title: "Delete Calendar Connection",
+      description: "Delete a calendar connection. Use this when you want to: 1) Remove a calendar connection 2) Stop automatic recordings 3) Clean up calendar data",
+      inputSchema: { calendar_id: z.string() },
+      annotations: { destructiveHint: true, idempotentHint: true }
+    },
     async (args) => {
       console.log("Attempting to delete calendar connection", redactArgs(args))
       const result = await baasClient.deleteCalendarConnection({ calendar_id: args.calendar_id })
@@ -759,10 +859,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Sync Calendar (equivalent to v1 resyncAllCalendars but per-calendar)
-  server.tool(
+  server.registerTool(
     "syncCalendar",
-    "Synchronize a specific calendar to fetch the latest events. Use this when you want to: 1) Force a calendar sync 2) Update event data 3) Refresh calendar information",
-    { calendar_id: z.string() },
+    {
+      title: "Sync Calendar",
+      description: "Synchronize a specific calendar to fetch the latest events. Use this when you want to: 1) Force a calendar sync 2) Update event data 3) Refresh calendar information",
+      inputSchema: { calendar_id: z.string() },
+      annotations: { destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to sync calendar", redactArgs(args))
       const result = await baasClient.syncCalendar({ calendar_id: args.calendar_id })
@@ -780,10 +884,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Resubscribe Calendar
-  server.tool(
+  server.registerTool(
     "resubscribeCalendar",
-    "Resubscribe a calendar's push notifications. Use this when you want to: 1) Restore event updates after a subscription lapses 2) Recover from missed calendar webhooks 3) Refresh the provider subscription",
-    { calendar_id: z.string() },
+    {
+      title: "Resubscribe Calendar",
+      description: "Resubscribe a calendar's push notifications. Use this when you want to: 1) Restore event updates after a subscription lapses 2) Recover from missed calendar webhooks 3) Refresh the provider subscription",
+      inputSchema: { calendar_id: z.string() },
+      annotations: { destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to resubscribe calendar", redactArgs(args))
       const result = await baasClient.resubscribeCalendar({ calendar_id: args.calendar_id })
@@ -801,15 +909,19 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // List Raw Calendars
-  server.tool(
+  server.registerTool(
     "listRawCalendars",
-    "List the raw calendars available from an OAuth provider before creating a connection. Use this when you want to: 1) Discover which calendars an account exposes 2) Find a calendar's id to connect 3) Verify OAuth credentials work",
     {
-      calendar_platform: z.enum(["google", "microsoft"]).describe("The calendar platform: 'google' or 'microsoft'"),
-      oauth_client_id: z.string(),
-      oauth_client_secret: z.string(),
-      oauth_refresh_token: z.string(),
-      oauth_tenant_id: z.string().optional()
+      title: "List Raw Calendars",
+      description: "List the raw calendars available from an OAuth provider before creating a connection. Use this when you want to: 1) Discover which calendars an account exposes 2) Find a calendar's id to connect 3) Verify OAuth credentials work",
+      inputSchema: {
+        calendar_platform: z.enum(["google", "microsoft"]).describe("The calendar platform: 'google' or 'microsoft'"),
+        oauth_client_id: z.string(),
+        oauth_client_secret: z.string(),
+        oauth_refresh_token: z.string(),
+        oauth_tenant_id: z.string().optional()
+      },
+      annotations: { readOnlyHint: true }
     },
     async (args) => {
       console.log("Attempting to list raw calendars", redactArgs(args))
@@ -830,16 +942,20 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // --- Calendar Events ---
 
   // List Events
-  server.tool(
+  server.registerTool(
     "listEvents",
-    "List calendar events. Use this when you want to: 1) View upcoming meetings 2) Check scheduled events 3) Browse calendar entries",
     {
-      calendar_id: z.string(),
-      limit: z.number().optional(),
-      cursor: z.string().optional(),
-      show_cancelled: z.boolean().optional(),
-      start_date: z.string().optional(),
-      end_date: z.string().optional()
+      title: "List Events",
+      description: "List calendar events. Use this when you want to: 1) View upcoming meetings 2) Check scheduled events 3) Browse calendar entries",
+      inputSchema: {
+        calendar_id: z.string(),
+        limit: z.number().optional(),
+        cursor: z.string().optional(),
+        show_cancelled: z.boolean().optional(),
+        start_date: z.string().optional(),
+        end_date: z.string().optional()
+      },
+      annotations: { readOnlyHint: true }
     },
     async (args) => {
       const { calendar_id, ...query } = args
@@ -859,10 +975,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Get Event Details
-  server.tool(
+  server.registerTool(
     "getEventDetails",
-    "Get detailed information about a specific calendar event. Use this when you want to: 1) View event details 2) Check attendees 3) See event configuration",
-    { calendar_id: z.string(), event_id: z.string() },
+    {
+      title: "Get Event Details",
+      description: "Get detailed information about a specific calendar event. Use this when you want to: 1) View event details 2) Check attendees 3) See event configuration",
+      inputSchema: { calendar_id: z.string(), event_id: z.string() },
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to get event details", redactArgs(args))
       const result = await baasClient.getEventDetails({
@@ -883,15 +1003,19 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // List Event Series
-  server.tool(
+  server.registerTool(
     "listEventSeries",
-    "List recurring event series for a calendar. Use this when you want to: 1) Find recurring meetings 2) Schedule a bot across all occurrences of a series 3) Browse repeating calendar entries",
     {
-      calendar_id: z.string(),
-      limit: z.number().optional(),
-      cursor: z.string().optional(),
-      event_type: z.string().optional(),
-      show_cancelled: z.boolean().optional()
+      title: "List Event Series",
+      description: "List recurring event series for a calendar. Use this when you want to: 1) Find recurring meetings 2) Schedule a bot across all occurrences of a series 3) Browse repeating calendar entries",
+      inputSchema: {
+        calendar_id: z.string(),
+        limit: z.number().optional(),
+        cursor: z.string().optional(),
+        event_type: z.string().optional(),
+        show_cancelled: z.boolean().optional()
+      },
+      annotations: { readOnlyHint: true }
     },
     async (args) => {
       const { calendar_id, ...query } = args
@@ -913,15 +1037,19 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // --- Calendar Bots ---
 
   // Create Calendar Bot (equivalent to v1 scheduleRecordEvent)
-  server.tool(
+  server.registerTool(
     "createCalendarBot",
-    "Schedule a bot to record a calendar event. Use this when you want to: 1) Set up automatic recording for a calendar event 2) Schedule future transcriptions 3) Plan meeting recordings based on calendar",
     {
-      calendar_id: z.string(),
-      series_id: z.string().describe("UUID of the event series to schedule bots for"),
-      all_occurrences: z.boolean().describe("Whether to schedule bots for all occurrences of the event series"),
-      event_id: z.string().optional().describe("UUID of a specific event instance (required when all_occurrences is false)"),
-      ...botConfigShape
+      title: "Create Calendar Bot",
+      description: "Schedule a bot to record a calendar event. Use this when you want to: 1) Set up automatic recording for a calendar event 2) Schedule future transcriptions 3) Plan meeting recordings based on calendar",
+      inputSchema: {
+        calendar_id: z.string(),
+        series_id: z.string().describe("UUID of the event series to schedule bots for"),
+        all_occurrences: z.boolean().describe("Whether to schedule bots for all occurrences of the event series"),
+        event_id: z.string().optional().describe("UUID of a specific event instance (required when all_occurrences is false)"),
+        ...botConfigShape
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       if (!args.all_occurrences && !args.event_id) {
@@ -947,12 +1075,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Delete Calendar Bot (equivalent to v1 unscheduleRecordEvent)
-  server.tool(
+  server.registerTool(
     "deleteCalendarBot",
-    "Cancel a scheduled calendar bot recording. Use this when you want to: 1) Cancel automatic recording 2) Stop planned transcription 3) Remove scheduled bot activity for an event",
     {
-      calendar_id: z.string(),
-      event_id: z.string()
+      title: "Delete Calendar Bot",
+      description: "Cancel a scheduled calendar bot recording. Use this when you want to: 1) Cancel automatic recording 2) Stop planned transcription 3) Remove scheduled bot activity for an event",
+      inputSchema: {
+        calendar_id: z.string(),
+        event_id: z.string()
+      },
+      annotations: { destructiveHint: true, idempotentHint: true }
     },
     async (args) => {
       console.log("Attempting to delete calendar bot", redactArgs(args))
@@ -974,15 +1106,19 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Update Calendar Bot
-  server.tool(
+  server.registerTool(
     "updateCalendarBot",
-    "Update the configuration of a bot scheduled for a calendar event. Use this when you want to: 1) Change recording settings for a scheduled calendar bot 2) Adjust bot options before the event 3) Modify a calendar-driven recording",
     {
-      calendar_id: z.string(),
-      event_id: z.string().describe("UUID of the event instance whose bot configuration is being updated"),
-      series_id: z.string().describe("UUID of the event series the bot is scheduled for"),
-      all_occurrences: z.boolean().describe("Whether the update applies to all occurrences of the event series"),
-      ...botUpdateShape
+      title: "Update Calendar Bot",
+      description: "Update the configuration of a bot scheduled for a calendar event. Use this when you want to: 1) Change recording settings for a scheduled calendar bot 2) Adjust bot options before the event 3) Modify a calendar-driven recording",
+      inputSchema: {
+        calendar_id: z.string(),
+        event_id: z.string().describe("UUID of the event instance whose bot configuration is being updated"),
+        series_id: z.string().describe("UUID of the event series the bot is scheduled for"),
+        all_occurrences: z.boolean().describe("Whether the update applies to all occurrences of the event series"),
+        ...botUpdateShape
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       const { calendar_id, event_id, ...body } = args
@@ -1004,10 +1140,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // --- Zoom Credentials ---
 
   // Create Zoom Credential
-  server.tool(
+  server.registerTool(
     "createZoomCredential",
-    "Store Zoom OAuth credentials for joining Zoom meetings with the Meeting SDK. Use this when you want to: 1) Enable Zoom SDK-based recording 2) Register a Zoom app's client credentials 3) Set up Zoom authentication",
-    zoomCredentialShape,
+    {
+      title: "Create Zoom Credential",
+      description: "Store Zoom OAuth credentials for joining Zoom meetings with the Meeting SDK. Use this when you want to: 1) Enable Zoom SDK-based recording 2) Register a Zoom app's client credentials 3) Set up Zoom authentication",
+      inputSchema: zoomCredentialShape,
+      annotations: { destructiveHint: false }
+    },
     async (args) => {
       console.log("Attempting to create zoom credential", redactArgs(args))
       const result = await baasClient.createZoomCredential(args)
@@ -1025,17 +1165,21 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // List Zoom Credentials
-  server.tool(
+  server.registerTool(
     "listZoomCredentials",
-    "List stored Zoom credentials. Use this when you want to: 1) View configured Zoom apps 2) Find a credential id 3) Audit Zoom integration settings",
     {
-      name: z.string().optional(),
-      zoom_email: z.string().optional(),
-      zoom_display_name: z.string().optional(),
-      zoom_user_id: z.string().optional(),
-      credential_type: z.string().optional(),
-      state: z.string().optional(),
-      extra: z.string().optional()
+      title: "List Zoom Credentials",
+      description: "List stored Zoom credentials. Use this when you want to: 1) View configured Zoom apps 2) Find a credential id 3) Audit Zoom integration settings",
+      inputSchema: {
+        name: z.string().optional(),
+        zoom_email: z.string().optional(),
+        zoom_display_name: z.string().optional(),
+        zoom_user_id: z.string().optional(),
+        credential_type: z.string().optional(),
+        state: z.string().optional(),
+        extra: z.string().optional()
+      },
+      annotations: { readOnlyHint: true }
     },
     async (args) => {
       console.log("Attempting to list zoom credentials", redactArgs(args))
@@ -1054,10 +1198,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Get Zoom Credential
-  server.tool(
+  server.registerTool(
     "getZoomCredential",
-    "Get details about a specific Zoom credential. Use this when you want to: 1) Inspect a stored Zoom credential 2) Verify its configuration 3) Check the linked Zoom account",
-    { id: z.string() },
+    {
+      title: "Get Zoom Credential",
+      description: "Get details about a specific Zoom credential. Use this when you want to: 1) Inspect a stored Zoom credential 2) Verify its configuration 3) Check the linked Zoom account",
+      inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true }
+    },
     async (args) => {
       console.log("Attempting to get zoom credential", redactArgs(args))
       const result = await baasClient.getZoomCredential({ id: args.id })
@@ -1075,17 +1223,21 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Update Zoom Credential
-  server.tool(
+  server.registerTool(
     "updateZoomCredential",
-    "Update a stored Zoom credential. Use this when you want to: 1) Rotate Zoom client secrets 2) Rename a credential 3) Re-authorize with a new authorization code",
     {
-      id: z.string(),
-      name: z.string().min(1).max(100).optional(),
-      client_id: z.string().optional(),
-      client_secret: z.string().optional(),
-      authorization_code: z.string().optional(),
-      redirect_uri: z.string().optional(),
-      extra: z.record(z.unknown()).optional()
+      title: "Update Zoom Credential",
+      description: "Update a stored Zoom credential. Use this when you want to: 1) Rotate Zoom client secrets 2) Rename a credential 3) Re-authorize with a new authorization code",
+      inputSchema: {
+        id: z.string(),
+        name: z.string().min(1).max(100).optional(),
+        client_id: z.string().optional(),
+        client_secret: z.string().optional(),
+        authorization_code: z.string().optional(),
+        redirect_uri: z.string().optional(),
+        extra: z.record(z.unknown()).optional()
+      },
+      annotations: { destructiveHint: false }
     },
     async (args) => {
       const { id, ...body } = args
@@ -1105,10 +1257,14 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   )
 
   // Delete Zoom Credential
-  server.tool(
+  server.registerTool(
     "deleteZoomCredential",
-    "Delete a stored Zoom credential. Use this when you want to: 1) Remove an unused Zoom credential 2) Revoke a compromised credential 3) Clean up Zoom integration settings",
-    { id: z.string() },
+    {
+      title: "Delete Zoom Credential",
+      description: "Delete a stored Zoom credential. Use this when you want to: 1) Remove an unused Zoom credential 2) Revoke a compromised credential 3) Clean up Zoom integration settings",
+      inputSchema: { id: z.string() },
+      annotations: { destructiveHint: true, idempotentHint: true }
+    },
     async (args) => {
       console.log("Attempting to delete zoom credential", redactArgs(args))
       const result = await baasClient.deleteZoomCredential({ id: args.id })
@@ -1128,12 +1284,16 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // --- AI Agent Tools ---
 
   // Get Transcript
-  server.tool(
+  server.registerTool(
     "getTranscript",
-    "Get a meeting transcript as a readable dialog or full JSON with metadata. Use this when you want to: 1) Read what was said in a meeting 2) Get a conversation summary 3) Access raw transcription data",
     {
-      bot_id: z.string(),
-      format: z.enum(["dialog", "full"]).default("dialog").describe("'dialog' returns a readable merged conversation, 'full' returns the raw transcription JSON")
+      title: "Get Transcript",
+      description: "Get a meeting transcript as a readable dialog or full JSON with metadata. Use this when you want to: 1) Read what was said in a meeting 2) Get a conversation summary 3) Access raw transcription data",
+      inputSchema: {
+        bot_id: z.string(),
+        format: z.enum(["dialog", "full"]).default("dialog").describe("'dialog' returns a readable merged conversation, 'full' returns the raw transcription JSON")
+      },
+      annotations: { readOnlyHint: true }
     },
     async (args) => {
       console.log("Attempting to get transcript", { bot_id: args.bot_id, format: args.format })
@@ -1221,16 +1381,6 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
       }
     }
   )
-
-  // Add echo tool for testing
-  server.tool("echo", { message: z.string() }, async ({ message }: { message: string }) => ({
-    content: [
-      {
-        type: "text" as const,
-        text: `Tool echo: ${message}`
-      }
-    ]
-  }))
 
   return server
 }
