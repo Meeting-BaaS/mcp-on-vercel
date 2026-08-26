@@ -9,83 +9,6 @@ const handler = initializeMcpApiHandler(
   {
     capabilities: {
       tools: {
-        // V1 Meeting Management Category
-        joinMeeting: {
-          description:
-            "Send an AI bot to join a video meeting. The bot can record the meeting, transcribe speech (enabled by default using Gladia), and provide real-time audio streams.",
-          category: "Meeting Management",
-          apiVersion: "v1"
-        },
-        leaveMeeting: {
-          description: "Remove an AI bot from a meeting.",
-          category: "Meeting Management",
-          apiVersion: "v1"
-        },
-        getMeetingData: {
-          description: "Get data about a meeting that a bot has joined.",
-          category: "Meeting Management",
-          apiVersion: "v1"
-        },
-        deleteData: {
-          description: "Delete data associated with a meeting bot.",
-          category: "Meeting Management",
-          apiVersion: "v1"
-        },
-        retranscribeBot: {
-          description: "Transcribe or retranscribe a bot recording.",
-          category: "Meeting Management",
-          apiVersion: "v1"
-        },
-
-        // V1 Calendar Management Category
-        createCalendar: {
-          description: "Create a new calendar integration.",
-          category: "Calendar Management",
-          apiVersion: "v1"
-        },
-        listCalendars: {
-          description: "List all calendar integrations.",
-          category: "Calendar Management",
-          apiVersion: "v1/v2"
-        },
-        getCalendar: {
-          description: "Get details about a specific calendar integration.",
-          category: "Calendar Management",
-          apiVersion: "v1"
-        },
-        deleteCalendar: {
-          description: "Delete a calendar integration.",
-          category: "Calendar Management",
-          apiVersion: "v1"
-        },
-        listEvents: {
-          description: "List all scheduled events.",
-          category: "Calendar Management",
-          apiVersion: "v1/v2"
-        },
-        scheduleRecordEvent: {
-          description: "Schedule a recording.",
-          category: "Calendar Management",
-          apiVersion: "v1"
-        },
-        unscheduleRecordEvent: {
-          description: "Cancel a scheduled recording.",
-          category: "Calendar Management",
-          apiVersion: "v1"
-        },
-        updateCalendar: {
-          description: "Update a calendar integration configuration.",
-          category: "Calendar Management",
-          apiVersion: "v1"
-        },
-
-        // V1 Bot Management Category
-        botsWithMetadata: {
-          description: "Get a list of all bots with their metadata.",
-          category: "Bot Management",
-          apiVersion: "v1"
-        },
-
         // V2 Bot Management Category
         createBot: {
           description:
@@ -116,6 +39,11 @@ const handler = initializeMcpApiHandler(
         },
         deleteBotData: {
           description: "Delete data associated with a meeting bot.",
+          category: "Bot Management",
+          apiVersion: "v2"
+        },
+        retranscribeBot: {
+          description: "Transcribe or retranscribe a bot recording, optionally with a different provider.",
           category: "Bot Management",
           apiVersion: "v2"
         },

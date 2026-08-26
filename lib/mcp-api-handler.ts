@@ -60,7 +60,8 @@ export function initializeMcpApiHandler(
     console.log("The environment is", environment)
     console.log("The API Base Url has been set to", baseUrl)
 
-    // Extract API version from header (default to v1 for backward compatibility)
+    // Extract API version from header. v1 tools were removed (see api/tools.ts);
+    // this only affects logging now — registerTools always registers v2 tools.
     const versionHeader = req.headers["x-api-version"]
     const versionValue = Array.isArray(versionHeader) ? versionHeader[0] : versionHeader
     let apiVersion: "v1" | "v2" = "v1"
