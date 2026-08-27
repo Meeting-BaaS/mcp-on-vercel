@@ -314,6 +314,39 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
     }
   )
 
+  // Retranscribe Bot (equivalent to v1 retranscribeBot)
+  server.tool(
+    "retranscribeBot",
+    "Transcribe or retranscribe a bot recording using the Default or a specified Speech to Text Provider. Use this when you want to: 1) Get a transcript for a bot that was recorded without transcription 2) Re-run transcription with a different provider or settings. Requires the bot to have an audio recording and be in 'completed' or 'failed' status — other statuses return a 409.",
+    {
+      bot_id: z.string(),
+      transcription: z.object({
+        provider: z.enum(["gladia", "deepgram", "assemblyai", "speechmatics", "soniox"]).optional(),
+        api_key: z.string().optional(),
+        region: z.string().optional(),
+        custom_params: z.record(z.unknown()).optional()
+      }).optional().describe("Optional transcription config override. If omitted, uses the bot's original config.")
+    },
+    async (args) => {
+      console.log("Attempting to retranscribe bot", redactArgs(args))
+      const { bot_id, transcription } = args
+      const result = await baasClient.retranscribeBot({
+        bot_id,
+        body: transcription ? { transcription } : undefined
+      })
+      if (!result.success) {
+        console.error("Failed to retranscribe bot", result.error)
+        return {
+          content: [{ type: "text" as const, text: `Failed to retranscribe bot: ${result.error}` }],
+          isError: true
+        }
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result.data, null, 2) }]
+      }
+    }
+  )
+
   // Batch Create Bots
   server.tool(
     "batchCreateBots",
