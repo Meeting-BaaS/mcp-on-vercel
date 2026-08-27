@@ -317,7 +317,7 @@ export function registerV2Tools(server: McpServer, apiKey: string, baseUrl?: str
   // Retranscribe Bot (equivalent to v1 retranscribeBot)
   server.tool(
     "retranscribeBot",
-    "Transcribe or retranscribe a bot recording using the Default or a specified Speech to Text Provider. Use this when you want to: 1) Get a transcript for a bot that was recorded without transcription 2) Re-run transcription with a different provider or settings",
+    "Transcribe or retranscribe a bot recording using the Default or a specified Speech to Text Provider. Use this when you want to: 1) Get a transcript for a bot that was recorded without transcription 2) Re-run transcription with a different provider or settings. Requires the bot to have an audio recording and be in 'completed' or 'failed' status — other statuses return a 409.",
     {
       bot_id: z.string(),
       transcription: z.object({
